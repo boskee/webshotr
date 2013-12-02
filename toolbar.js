@@ -1,8 +1,10 @@
 function writeToolbarScript(name) {
-  var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = false;
-  ga.src = ('https:' == document.location.protocol ? 'https://' : 'http://') + 'spwo.alpha/html5/toolbar/' + name;
+  var tb = document.createElement('script');
+  tb.type = 'text/javascript';
+  tb.async = false;
+  tb.src = './src/' + name;
   var s = document.getElementsByTagName('script')[0];
-  s.parentNode.insertBefore(ga, s);
+  s.parentNode.insertBefore(tb, s);
 
 }
 

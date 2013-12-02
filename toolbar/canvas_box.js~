@@ -1,0 +1,631 @@
+if (!$) {
+  $ = jQuery;
+}
+
+painter.Rect = function(x, y, w, h) {
+  return painter.Rect.superClass_.constructor.apply(
+      this, [x, y, w, h]);
+};
+
+function tempCtor() {};
+tempCtor.prototype = math.Rect.prototype;
+painter.Rect.superClass_ = math.Rect.prototype;
+painter.Rect.prototype = new tempCtor();
+painter.Rect.prototype.constructor = painter.Rect;
+
+painter.Rect.prototype.fill = function(ctx, style) {
+  ctx.save();
+  ctx.fillStyle = style;
+  ctx.fillRect(this.left, this.top, this.width, this.height);
+  ctx.restore();
+};
+
+painter.Rect.prototype.shift = function(x, y) {
+  this.left += x;
+	this.top += y;
+	return this;
+};
+
+String.prototype.capitalize = function() {
+    return this.charAt(0).toUpperCase() + this.slice(1);
+}
+
+function getTextNodesIn(node, start) {
+  var textNodes = [];
+  var start = start || 0,
+      end = start;
+  if (node.nodeType == 3) {
+    end += node.length;
+    textNodes.push([node, start, end]);
+  } else {
+    var children = node.childNodes;
+    for (var i = 0, len = children.length; i < len; ++i) {
+      textNodes.push.apply(textNodes, getTextNodesIn(children[i]));
+    }
+  }
+  return textNodes;
+}
+
+function setSelectionRange2(el, start, end) {
+  if (document.createRange && window.getSelection) {
+    var range = document.createRange();
+    range.selectNodeContents(el);
+    var textNodes = getTextNodesIn(el);
+    var foundStart = false;
+    var charCount = 0, endCharCount;
+
+    for (var i = 0, textNode; textNode = textNodes[i++]; ) {
+      endCharCount = charCount + textNode.length;
+      if (!foundStart && start >= charCount
+              && (start < endCharCount ||
+              (start == endCharCount && i < textNodes.length))) {
+        range.setStart(textNode, start - charCount);
+        foundStart = true;
+      }
+      if (foundStart && end <= endCharCount) {
+        range.setEnd(textNode, end - charCount);
+        break;
+      }
+      charCount = endCharCount;
+    }
+
+    var sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+} else if (document.selection && document.body.createTextRange) {
+    var textRange = document.body.createTextRange();
+    textRange.moveToElementText(el);
+    textRange.collapse(true);
+    textRange.moveEnd("character", end);
+    textRange.moveStart("character", start);
+    textRange.select();
+  }
+}
+
+function setSelectionRange(el, textNode, start, end) {
+  if (document.createRange && window.getSelection) {
+    var range = document.createRange();
+    range.selectNodeContents(el);
+    var foundStart = false;
+    var charCount = 0, endCharCount;
+
+    endCharCount = charCount + textNode.length;
+    if (!foundStart && start >= charCount
+      && (start < endCharCount ||
+      (start == endCharCount && i < textNodes.length))) {
+      range.setStart(textNode, start - charCount);
+      foundStart = true;
+    }
+    if (foundStart && end <= endCharCount) {
+      range.setEnd(textNode, end - charCount);
+    }
+    charCount = endCharCount;
+
+    return range;
+  } else if (document.selection && document.body.createTextRange) {
+    var textRange = document.body.createTextRange();
+    textRange.moveToElementText(el);
+    textRange.collapse(true);
+    textRange.moveEnd("character", end);
+    textRange.moveStart("character", start);
+    textRange.select();
+  }
+}
+
+
+/**
+ * Class for representing a box. A box is specified as a top, right, bottom,
+ * and left. A box is useful for representing margins and padding.
+ *
+ * @param {number} top Top.
+ * @param {number} right Right.
+ * @param {number} bottom Bottom.
+ * @param {number} left Left.
+ * @constructor
+ */
+painter.Box = function(dimensions) {
+
+  this.dimensions = dimensions;
+
+  //this.type = element.tagName;
+  
+  this.style = {};
+  
+  this.parent;
+  
+  this.children = [];
+  
+  this.renderQueue = -1;
+};
+
+painter.Box.parseStyle = function(element) {
+  var style3 = painter.style.getStyleObject(element);
+  if (!style3) {
+    return false;
+  }
+  
+  var offset = painter.style.getPageOffset(element);
+  
+  var style2 = $.extend({}, style3, {
+    rect: new math.Rect(offset.x, offset.y, $(element).outerWidth(), $(element).outerHeight()),
+    border: {
+      top: parseInt(style3.borderTopWidth, 10),
+      right: parseInt(style3.borderRightWidth, 10),
+      bottom: parseInt(style3.borderBottomWidth, 10),
+      left: parseInt(style3.borderLeftWidth, 10),
+    },
+    padding: {
+      top: parseInt(style3.paddingTop, 10),
+      right: parseInt(style3.paddingRight, 10),
+      bottom: parseInt(style3.paddingBottom, 10),
+      left: parseInt(style3.paddingLeft, 10)
+    },
+    borderRadius: {
+      topLeft: parseInt(style3.borderTopLeftRadius, 10),
+      topRight: parseInt(style3.borderTopRightRadius, 10),
+      bottomLeft: parseInt(style3.borderBottomLeftRadius, 10),
+      bottomRight: parseInt(style3.borderBottomRightRadius, 10)
+    },
+    hasBorder: false,
+    hasBorderRadius: false,
+    visibleBox: false,
+    tagName: element.tagName,
+    shadow: null,
+    textAlign: style3.textAlign.replace('-webkit-auto', 'left'),
+    text: [],
+    textIndent: parseInt(style3.textIndent, 10)
+  });
+  
+  if (element.tagName == 'SELECT' || element.tagName == 'OPTION') {
+    //console.log(element.options);
+  } else if (element.tagName == 'INPUT' && (element.type == 'text' || element.type == 'submit')) {
+    /*style2.text = element.value;
+    if (style3.textTransform == 'uppercase') {
+      style2.text.push(style2.text.toUpperCase());
+      //console.log(style3);
+    }*/
+  } else {
+    for (var i = 0, j = element.childNodes.length; i < j; i++) {
+      if (element.childNodes[i].nodeType == 3 && !is_all_ws(element.childNodes[i])) {
+        var rng = setSelectionRange(element, element.childNodes[i], 0, 100);
+        console.log(rng);
+        var t = data_of(element.childNodes[i]);
+        if (style3.textTransform == 'uppercase') {
+          t = t.toUpperCase();
+        }
+        style2.text.push({
+          text: t,
+          offset: {
+            left: rng.endContainer.offsetLeft,
+            top: rng.endContainer.offsetTop
+          }
+        });
+      }
+    }
+  }
+  
+  if (style3.boxShadow != 'none') {
+    var shadow = style3.boxShadow;
+    shadow = shadow.replace(/,\s+/g, ',_');
+    var parts = shadow.split(' ');
+    style2.shadow = {
+      color: parts[0].replace(/_/g, ' '),
+      x: parseFloat(parts[1], 10),
+      y: parseFloat(parts[2], 10),
+      blur: parseFloat(parts[3], 10)
+    };
+  }
+  
+  if (style2.tagName == 'IMG') {
+    style2.src = element.src;
+  }
+  
+  var visibleBox = painter.style.getVisibleRectForElement(element);
+  if (visibleBox) {
+    style2.visibleBox = math.Rect.createFromBox(visibleBox);
+  }
+  
+  style2.backgroundColor = painter.style.normalizeColour(style2.backgroundColor);
+  
+  var sides = ['top', 'right', 'bottom', 'left'];
+  
+  for (var i = 0, j = sides.length; i < j; i++) {
+    if (style2.border[sides[i]] > 0) {
+      var v = 'border' + sides[i].capitalize() + 'Color';
+      style2[v] = painter.style.normalizeColour(style2[v]);
+      style2.hasBorder = true;
+    }
+  }
+  
+  style2.hasBorderRadius = (style2.borderRadius.topLeft > 0 || style2.borderRadius.topRight > 0 || style2.borderRadius.bottomLeft > 0 || style2.borderRadius.bottomRight > 0);
+  
+  style2.hasBackgroundColor = (style2.backgroundColor != 'transparent');
+  
+  return style2;
+};
+
+painter.Box.prototype.setStyle = function(style) {
+  this.style = style;
+};
+
+painter.Box.prototype.render = function() {
+  if (!this.style) {
+    if (this.parent) {
+      this.parent.renderNext();
+    }
+    return;
+  }
+  var ctx = document.getElementById('thecanvas').getContext("2d");
+
+  ctx.globalAlpha = this.style.opacity;
+  if (this.style.visibility == 'visible' && this.style.display != 'none') {
+  
+    if (this.style.rect.width > 0 && this.style.rect.height > 0) {
+      ctx.save();
+      
+      if (this.style.shadow !== null) {
+        ctx.shadowOffsetX = this.style.shadow.x;
+        ctx.shadowOffsetY = this.style.shadow.y;
+        ctx.shadowColor = this.style.shadow.color;
+        ctx.shadowBlur = this.style.shadow.blur;
+      }
+
+      if (this.style.hasBorderRadius) {       
+        var rectWidth = this.style.rect.width;
+        var rectHeight = this.style.rect.height;
+        
+        var rectX = this.style.rect.left;
+        var rectY = this.style.rect.top;
+        ctx.beginPath();    
+        
+        ctx.moveTo(rectX + this.style.borderRadius.topLeft, rectY);
+        ctx.lineTo(rectX + rectWidth - this.style.borderRadius.topRight, rectY);
+        ctx.quadraticCurveTo(rectX + rectWidth, rectY, rectX + rectWidth, rectY + this.style.borderRadius.topRight);
+        ctx.lineTo(rectX + rectWidth, rectY + rectHeight - this.style.borderRadius.bottomRight);
+        ctx.quadraticCurveTo(rectX + rectWidth, rectY + rectHeight, rectX + rectWidth - this.style.borderRadius.bottomRight, rectY + rectHeight);
+        ctx.lineTo(rectX + this.style.borderRadius.bottomLeft, rectY + rectHeight);
+        ctx.quadraticCurveTo(rectX, rectY + rectHeight, rectX, rectY + rectHeight - this.style.borderRadius.bottomLeft);
+        ctx.lineTo(rectX, rectY + this.style.borderRadius.topLeft);
+        ctx.quadraticCurveTo(rectX, rectY, rectX + this.style.borderRadius.topLeft, rectY);
+        ctx.closePath();
+        if (this.style.shadow != null) {
+       //var d = ctx.getImageData(rectX, rectY, rectWidth, rectHeight);  
+       //ctx.save();
+          ctx.fillStyle = '#ff0000';  
+          ctx.fill();
+          //ctx.restore();
+         //ctx.putImageData(d, rectX, rectY);  
+        }
+        // Clip to the current path
+        ctx.clip();
+      }
+
+      if (this.style.hasBackgroundColor) {
+        this.drawRect(this.style.rect.left, this.style.rect.top, this.style.rect.width, this.style.rect.height, this.style.backgroundColor);
+      } else if (this.style.shadow) {
+      var data = ctx.getImageData(this.style.rect.left, this.style.rect.top, this.style.rect.width, this.style.rect.height);
+        this.drawRect(this.style.rect.left, this.style.rect.top, this.style.rect.width, this.style.rect.height, 'rgb(0, 0, 0)');
+  ctx.putImageData(data, this.style.rect.left, this.style.rect.top);
+        data = null;
+      }
+      
+      ctx.restore();
+
+      this.drawBackground();
+    } else {
+      this.renderQueue = -1;
+      this.renderNext();
+    }
+  } else {
+    if (this.parent) {
+      this.parent.renderNext();
+    }
+  }
+};
+
+painter.Box.prototype.renderNext = function() {
+  this.renderQueue += 1;
+  if (this.renderQueue >= this.children.length) {
+    this.renderQueue = -1;
+    if (this.parent) {
+      this.parent.renderNext();
+    }
+  } else {
+    this.children[this.renderQueue].render();
+  }
+};
+
+painter.Box.prototype.drawChildren = function() {    
+  if (this.style.tagName == 'IMG') {
+    var that = this;
+    var img = new Image();
+    img.onerror = function() {
+      that.continueDrawing();
+    };
+    img.onload = function(){
+      imgWidth = this.width;
+      imgHeight = this.height;
+      var ctx = document.getElementById('thecanvas').getContext("2d");
+      var s = that.style;
+      ctx.drawImage(this, s.rect.left + s.border.left + s.padding.left, s.rect.top + s.border.top + s.padding.top, s.rect.width - s.border.left - s.border.right - s.padding.left - s.padding.right, s.rect.height - s.border.top - s.border.bottom - s.padding.top - s.padding.bottom);
+      that.continueDrawing();
+    };
+    img.src = this.style.src;
+  } else {     
+    this.continueDrawing();
+  }
+};
+
+painter.Box.prototype.continueDrawing = function() {
+  this.drawBorders(); 
+  if (this.style.hasBorderRadius) {
+    var ctx = document.getElementById('thecanvas').getContext("2d");
+    ctx.restore();
+  }
+  if (this.style.text.length > 0) {
+    this.drawText();
+  }
+  this.renderQueue = -1;
+  this.renderNext();
+};
+
+painter.Box.prototype.drawText = function() {
+  if (this.style.visibility != 'visible' || this.style.display == 'none') {
+    return false;
+  }
+  var ctx = document.getElementById('thecanvas').getContext("2d");  
+  var rect = this.style.rect.clone();
+  rect.left += this.style.border.left + this.style.padding.left;
+  rect.top += this.style.border.top + this.style.padding.top;
+  rect.width -= this.style.border.left + this.style.border.right + this.style.padding.left + this.style.padding.right;
+  rect.height -= this.style.border.top + this.style.border.bottom + this.style.padding.top + this.style.padding.bottom;
+  if (this.style.visibleBox) {
+    if (!rect.intersection(this.style.visibleBox)) {
+      return false;
+    }
+  }
+  
+  ctx.save();
+  
+  ctx.fillStyle = this.style.color;
+	ctx.font = this.style.fontWeight + " " + this.style.fontSize + "/" + this.style.lineHeight + " " + this.style.fontFamily;
+  ctx.textAlign = this.style.textAlign;
+  ctx.textBaseline = 'middle';
+  
+  if (ctx.textAlign == 'center') {
+    rect.left += rect.width / 2;
+  } else if (ctx.textAlign == 'right') {
+    rect.left += rect.width;
+  }
+  
+  if (this.style.textShadow != 'none') {
+    console.log(this.style.rect);
+    console.log(rect);
+    console.log('----');
+    var shadow = this.style.textShadow;
+    shadow = shadow.replace(/,\s+/g, ',_');
+    var parts = shadow.split(' ');
+    ctx.shadowOffsetX = parseFloat(parts[1], 10);
+    ctx.shadowOffsetY = parseFloat(parts[2], 10);
+    ctx.shadowColor = parts[0].replace(/_/g, ' ');
+    ctx.shadowBlur = parseFloat(parts[3], 10);
+  }
+  
+  var lh = parseInt(this.style.lineHeight, 10);
+  //rect.top += Math.floor(lh  / 2);
+  
+  for (var i = 0, j = this.style.text.length; i < j; i++) {
+    //console.log(this.style.text[i].offset);
+    var rct = rect.clone();
+    rct.left += this.style.text[i].offset.left;
+    wrapText(ctx, this.style.text[i].text, rct.left, rct.top, rct.width, parseFloat(this.style.lineHeight, 10), this.style.textIndent);
+  }
+    
+  ctx.restore();
+};
+
+painter.Box.prototype.setParent = function(parent) {    
+  if (!(parent instanceof painter.Box)) {
+    return false;
+  }
+  this.parent = parent;
+};
+
+painter.Box.prototype.drawRect = function(x, y, width, height, color, shiftX, shiftY) {  
+	var ctx = document.getElementById('thecanvas').getContext("2d");
+	shiftX = shiftX || 0;
+	shiftY = shiftY || 0;
+		
+  var rect = new painter.Rect(shiftX+x, shiftY + y, width, height);
+  var old = rect.clone();
+  if (this.style.visibleBox) {
+    if (!rect.intersection(this.style.visibleBox)) {
+      return false;
+    }
+  }
+  
+  if (rect.width <= 0 || rect.height <= 0) {
+    return false;
+  }
+  
+  var slices = [], diffs = [];  
+  if (ctx.shadowBlur > 0) {
+    diffs = old.difference(rect);
+    if (diffs.length > 0) {
+      for (var i = 0, j = diffs.length; i < j; i++) {
+        slices.push(ctx.getImageData(diffs[i].left, diffs[i].top, diffs[i].width, diffs[i].height));
+      }
+    }
+  }
+  
+	ctx.translate(shiftX, shiftY);
+	rect.shift(shiftX*-1, shiftY*-1).fill(ctx, color);
+	ctx.translate(shiftX*-1, shiftY*-1);
+	
+  if (slices.length > 0) {
+    for (var i = 0, j = slices.length; i < j; i++) {
+      ctx.putImageData(slices[i], diffs[i].left, diffs[i].top);
+    }
+    slices = diffs = null;
+  }
+};
+
+painter.Box.prototype.drawBorders = function() {
+  if (!this.style.hasBorder) {
+    return false;
+  }
+	
+  if (this.style.border.left > 0 && this.style.borderLeftColor != 'transparent') {
+    this.drawRect(this.style.rect.left, this.style.rect.top, this.style.border.left, this.style.rect.height, this.style.borderLeftColor);
+  }
+
+  if (this.style.border.right > 0 && this.style.borderRightColor != 'transparent') {
+    this.drawRect((this.style.rect.left + this.style.rect.width) - this.style.border.right, this.style.rect.top, this.style.border.right, this.style.rect.height, this.style.borderRightColor);
+  }
+
+  if (this.style.border.top > 0 && this.style.borderTopColor != 'transparent') {
+    this.drawRect(this.style.rect.left, this.style.rect.top, this.style.rect.width, this.style.border.top, this.style.borderTopColor);
+  }
+
+  if (this.style.border.bottom > 0 && this.style.borderBottomColor != 'transparent') {
+    this.drawRect(this.style.rect.left, (this.style.rect.top + this.style.rect.height) - this.style.border.bottom, this.style.rect.width, this.style.border.bottom, this.style.borderBottomColor);
+  }
+};
+
+painter.Box.prototype.drawBackground = function() {
+  if (!this.style.backgroundImage || this.style.backgroundImage == 'none') {
+    this.drawChildren();
+    return false;
+  }
+
+  var ctx = document.getElementById('thecanvas').getContext("2d");
+  
+  var imgSrc = this.style.backgroundImage.replace(/url\(([^\)]+)\)/, '$1'); 
+  var imgOffset = { left: this.style.rect.left, top: this.style.rect.top };
+  
+  var bgPos = this.style.backgroundPosition.split(' ');
+  
+  var bgRepeat = false;
+  
+  if (this.style.backgroundRepeat != 'no-repeat') {
+    bgRepeat = {
+      x: (this.style.backgroundRepeat == 'repeat' || this.style.backgroundRepeat == 'repeat-x'),
+      y: (this.style.backgroundRepeat == 'repeat' || this.style.backgroundRepeat == 'repeat-y')
+    };
+  }
+  
+  if (this.style.backgroundImage.indexOf('-webkit-gradient') != -1) {
+    var lingrad = ctx.createLinearGradient(0, 0, 0, this.style.rect.height);
+    var from = this.style.backgroundImage.replace(/(.*)from\(([^\)]+)\)(.*)/, '$2');
+    if (from.indexOf('(') != -1) {
+      from += ')';
+    }
+    var to = this.style.backgroundImage.replace(/(.*)to\(([^\)]+)\)(.*)/, '$2');
+    if (to.indexOf('(') != -1) {
+      to += ')';
+    }
+    lingrad.addColorStop(0, to);
+    lingrad.addColorStop(1, from);
+    this.drawRect(0, 0, this.style.rect.width, this.style.rect.height, lingrad, this.style.rect.left, this.style.rect.top);
+    
+    this.drawChildren();
+  } else { 
+    var elemWidth = this.style.rect.width;
+    var elemHeight = this.style.rect.height;   
+    var that = this; 
+    var img = new Image();
+    img.onerror = function() {
+      that.drawChildren();
+    };
+    img.onload = function(){
+      var imgWidth = this.width;
+      var imgHeight = this.height;
+      var patternX = 0;
+      var patternY = 0;
+      var patternWidth = elemWidth;
+      var patternHeight = elemHeight;
+      
+      var shiftX = that.style.border.left,
+          shiftY = that.style.border.top;
+      
+      if (bgPos[0].indexOf('%') != -1) {
+        var mod = parseFloat(bgPos[0], 10)/100;
+        shiftX += ((elemWidth - imgWidth) * mod) - ((that.style.border.left + that.style.border.right)*mod);
+      } else {
+        shiftX += parseInt(bgPos[0], 10);
+      }
+      
+      if (bgPos[1].indexOf('%') != -1) {
+        var mod = parseFloat(bgPos[1], 10)/100;
+        shiftY += ((elemHeight - imgHeight) * mod) - ((that.style.border.bottom + that.style.border.top)*mod);
+      } else {
+        shiftY += parseInt(bgPos[1], 10);
+      }
+      
+      imgOffset.left += shiftX;
+      imgOffset.top += shiftY;
+      patternX = shiftX * -1;
+      patternY = shiftY * -1;
+      
+      if (!bgRepeat.x) {
+        if (shiftX >= 0) {
+          patternX = 0;
+          patternWidth -= Math.abs(shiftX);
+          if (imgWidth < (elemWidth - shiftX)) {
+            patternWidth = imgWidth;
+          }
+        } else {
+          patternWidth = imgWidth + shiftX;
+        }
+      }
+      
+      if (!bgRepeat.y) {
+        if (shiftY >= 0) {
+          patternY = 0;
+          patternHeight -= Math.abs(shiftY);
+          if (imgHeight < (elemHeight - shiftY)) {
+            patternHeight = imgHeight;
+          }
+        } else {
+          patternHeight = imgHeight + shiftY;
+        }
+      }
+
+      that.drawRect(Math.floor(patternX), Math.floor(patternY), Math.floor(Math.min(elemWidth, patternWidth)), Math.floor(Math.min(elemHeight, patternHeight)), ctx.createPattern(this, 'repeat'), Math.ceil(imgOffset.left), Math.ceil(imgOffset.top));
+      
+      that.drawChildren();
+    };
+    img.src = imgSrc;
+  }
+};
+
+painter.Box.prototype.addChild = function(child) {
+  if (!child || !(child instanceof painter.Box)) {
+    return;
+  }
+  
+  child.setParent(this);
+  
+  this.children.push(child);
+};
+
+painter.Box.fromDom = function(element) {
+  if (!element.tagName || element.tagName == 'SCRIPT' || element.tagName == 'STYLE' || element.tagName == 'LINK' || element.tagName == 'CANVAS' || is_all_ws(element) || element.nodeType == 3) {
+    return null;
+  }
+
+  var box_ = new painter.Box({});
+  box_.setStyle(painter.Box.parseStyle(element));
+
+  for (var i = 0, l = element.childNodes.length; i < l; i++) {
+    box_.addChild(painter.Box.fromDom(element.childNodes[i]));
+  }
+  
+  return box_;
+};
+	
+function is_all_ws( nod )
+{
+  // Use ECMA-262 Edition 3 String and RegExp features
+  return !(/[^\t\n\r ]/.test(nod.data));
+}

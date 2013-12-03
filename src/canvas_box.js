@@ -22,8 +22,8 @@ painter.Rect.prototype.fill = function(ctx, style) {
 
 painter.Rect.prototype.shift = function(x, y) {
   this.left += x;
-	this.top += y;
-	return this;
+  this.top += y;
+  return this;
 };
 
 String.prototype.capitalize = function() {
@@ -492,8 +492,8 @@ painter.Box.prototype.drawChildren = function() {
           y = s.rect.top + s.border.top + s.padding.top,
           w = parseInt(that.style.width) - s.border.left - s.border.right - s.padding.left - s.padding.right,
           h = parseInt(that.style.height) - s.border.top - s.border.bottom - s.padding.top - s.padding.bottom,
-          vW = s.visibleBox.width - s.border.left - s.border.right - s.padding.left - s.padding.right || w,
-          vH = s.visibleBox.height - s.border.top - s.border.bottom - s.padding.top - s.padding.bottom || h;
+          vW = s.visibleBox.width == Infinity ? w : (s.visibleBox.width - s.border.left - s.border.right - s.padding.left - s.padding.right || w),
+          vH = s.visibleBox.height == Infinity ? h : (s.visibleBox.height - s.border.top - s.border.bottom - s.padding.top - s.padding.bottom || h);
 
       var copy = document.createElement("canvas");
       document.body.appendChild(copy);
@@ -596,7 +596,7 @@ painter.Box.prototype.drawText = function() {
   ctx.save();
   
   ctx.fillStyle = this.style.color;
-	ctx.font = this.style.fontWeight + " " + this.style.fontSize + "/" + this.style.lineHeight + " " + this.style.fontFamily;
+  ctx.font = this.style.fontWeight + " " + this.style.fontSize + "/" + this.style.lineHeight + " " + this.style.fontFamily;
   ctx.textAlign = this.style.textAlign;
   ctx.textBaseline = 'middle';
   
@@ -656,10 +656,10 @@ painter.Box.prototype.setParent = function(parent) {
 };
 
 painter.Box.prototype.drawRect = function(x, y, width, height, color, shiftX, shiftY) {  
-	var ctx = document.getElementById('thecanvas').getContext("2d");
-	shiftX = shiftX || 0;
-	shiftY = shiftY || 0;
-		
+  var ctx = document.getElementById('thecanvas').getContext("2d");
+  shiftX = shiftX || 0;
+  shiftY = shiftY || 0;
+    
   var rect = new painter.Rect(shiftX+x, shiftY + y, width, height);
   var old = rect.clone();
   if (this.style.visibleBox) {
@@ -682,10 +682,10 @@ painter.Box.prototype.drawRect = function(x, y, width, height, color, shiftX, sh
     }
   }
   
-	ctx.translate(shiftX, shiftY);
-	rect.shift(shiftX*-1, shiftY*-1).fill(ctx, color);
-	ctx.translate(shiftX*-1, shiftY*-1);
-	
+  ctx.translate(shiftX, shiftY);
+  rect.shift(shiftX*-1, shiftY*-1).fill(ctx, color);
+  ctx.translate(shiftX*-1, shiftY*-1);
+  
   if (slices.length > 0) {
     for (var i = 0, j = slices.length; i < j; i++) {
       ctx.putImageData(slices[i], diffs[i].left, diffs[i].top);
@@ -698,7 +698,7 @@ painter.Box.prototype.drawBorders = function() {
   if (!this.style.hasBorder) {
     return false;
   }
-	
+  
   if (this.style.border.left > 0 && this.style.borderLeftColor != 'transparent') {
     this.drawRect(this.style.rect.left, this.style.rect.top, this.style.border.left, this.style.rect.height, this.style.borderLeftColor);
   }
@@ -831,7 +831,7 @@ painter.Box.prototype.addChild = function(child) {
   child.setParent(this);
   
   var zIndex = child.style.zIndex;
-  zIndex = zIndex.replace('auto', 0);
+  zIndex = zIndex.replace('auto', child.style.position == 'absolute' ? 1 : 0);
 
   if (!this.children[zIndex]) {
     this.children[zIndex] = [];
@@ -887,7 +887,7 @@ painter.Box.fromDom = function(element) {
   
   return box_;
 };
-	
+  
 function is_all_ws( nod )
 {
   // Use ECMA-262 Edition 3 String and RegExp features

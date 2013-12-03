@@ -136,6 +136,8 @@ function getTextNodeHeight(textNode) {
 }
 
 function getTextNodeOffsetTop(textNode) {
+    var scrollOffset = painter.style.getViewportPageOffset(document);
+
     var selHeight = 0;
     if (document.selection && document.selection.type == "Text") {
         var textRange = document.selection.createRange();
@@ -145,13 +147,15 @@ function getTextNodeOffsetTop(textNode) {
       range.selectNode(textNode);
       var rectList = range.getClientRects();
       if (rectList.length > 0) {
-        return rectList[0].top;
+        return Math.round(rectList[0].top + scrollOffset.y);
       }
     }
     return selHeight;
 }
 
 function getTextNodeOffsetLeft(textNode) {
+    var scrollOffset = painter.style.getViewportPageOffset(document);
+
     var selHeight = 0;
     if (document.selection && document.selection.type == "Text") {
         var textRange = document.selection.createRange();
@@ -161,7 +165,7 @@ function getTextNodeOffsetLeft(textNode) {
       range.selectNode(textNode);
       var rectList = range.getClientRects();
       if (rectList.length > 0) {
-        return rectList[0].left;
+        return Math.round(rectList[0].left + scrollOffset.x);
       }
     }
     return selHeight;

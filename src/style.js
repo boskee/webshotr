@@ -295,6 +295,21 @@ painter.style.getClientLeftTop = function(el) {
   return new math.Coordinate(el.clientLeft, el.clientTop);
 };
 
+/**
+ * Calculates the viewport coordinates relative to the page/document
+ * containing the node. The viewport may be the browser viewport for
+ * non-iframe document, or the iframe container for iframe'd document.
+ * @param {!Document} doc The document to use as the reference point.
+ * @return {!goog.math.Coordinate} The page offset of the viewport.
+ */
+painter.style.getViewportPageOffset = function(doc) {
+  var body = doc.body;
+  var documentElement = doc.documentElement;
+  var scrollLeft = body.scrollLeft || documentElement.scrollLeft;
+  var scrollTop = body.scrollTop || documentElement.scrollTop;
+  return new math.Coordinate(scrollLeft, scrollTop);
+};
+
 painter.style.isRightToLeft = function(el) {
   var style = painter.style.getStyleObject(el);
   return 'rtl' == style.direction;

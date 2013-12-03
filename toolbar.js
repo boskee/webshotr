@@ -38,7 +38,8 @@ function wrapText(context, text, x, y, maxWidth, lineHeight, textIndent, textOff
 
   textIndent += textOffset.left;
 
-  y += textOffset.top + (lineHeight / 2);
+  //y += textOffset.top;
+  //y += (lineHeight / 2);
 
   for (var n = 0; n < words.length; n++) {
       var testLine = line + words[n];
@@ -70,7 +71,8 @@ function wrappedTextHeight(context, text, x, y, maxWidth, lineHeight, textIndent
 
   textIndent += textOffset.left;
 
-  y += textOffset.top + (lineHeight / 2);
+  //y += textOffset.top;
+  //y += (lineHeight / 2);
 
   for (var n = 0; n < words.length; n++) {
       var testLine = line + words[n];

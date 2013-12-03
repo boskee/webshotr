@@ -16,6 +16,8 @@ painter.Rect.prototype.constructor = painter.Rect;
 painter.Rect.prototype.fill = function(ctx, style) {
   ctx.save();
   ctx.fillStyle = style;
+  console.log(style);
+  console.log("CANVAS PATTERN: " + this.width + " x " + this.height);
   ctx.fillRect(this.left, this.top, this.width, this.height);
   ctx.restore();
 };
@@ -260,6 +262,10 @@ painter.Box.parseStyle = function(element) {
             t = t.substring(1, t.length);
           }
         }
+        if (element.className == 'temperature') {
+          console.log(getTextNodeOffsetLeft(element.childNodes[i]));
+          console.log(offset.x);
+        }
         textOffset.x = getTextNodeOffsetLeft(element.childNodes[i]) - (offset.x + style2.padding.left);
         textOffset.y = getTextNodeOffsetTop(element.childNodes[i]) - (offset.y + style2.padding.top);
         style2.text.push({
@@ -375,7 +381,7 @@ painter.Box.prototype.render = function() {
       } else if (this.style.shadow) {
       var data = ctx.getImageData(this.style.rect.left, this.style.rect.top, this.style.rect.width, this.style.rect.height);
         this.drawRect(this.style.rect.left, this.style.rect.top, this.style.rect.width, this.style.rect.height, 'rgb(0, 0, 0)');
-  ctx.putImageData(data, this.style.rect.left, this.style.rect.top);
+        ctx.putImageData(data, this.style.rect.left, this.style.rect.top);
         data = null;
       }
       
@@ -597,14 +603,14 @@ painter.Box.prototype.drawText = function() {
   
   ctx.fillStyle = this.style.color;
   ctx.font = this.style.fontWeight + " " + this.style.fontSize + "/" + this.style.lineHeight + " " + this.style.fontFamily;
-  ctx.textAlign = this.style.textAlign;
-  ctx.textBaseline = 'middle';
+  //ctx.textAlign = this.style.textAlign;
+  ctx.textBaseline = 'top';
   
-  if (ctx.textAlign == 'center') {
+  /*if (ctx.textAlign == 'center') {
     rect.left += rect.width / 2;
   } else if (ctx.textAlign == 'right') {
     rect.left += rect.width;
-  }
+  }*/
 
   if (this.style.textShadow != 'none') {
     /*console.log(this.style.rect);
@@ -730,6 +736,7 @@ painter.Box.prototype.drawBackground = function() {
   var bgPos = this.style.backgroundPosition.split(' ');
   
   var bgRepeat = false;
+  var bgSize = this.style.backgroundSize;
   
   if (this.style.backgroundRepeat != 'no-repeat') {
     bgRepeat = {
@@ -815,7 +822,32 @@ painter.Box.prototype.drawBackground = function() {
         }
       }
 
-      that.drawRect(Math.floor(patternX), Math.floor(patternY), Math.floor(Math.min(elemWidth, patternWidth)), Math.floor(Math.min(elemHeight, patternHeight)), ctx.createPattern(this, 'repeat'), Math.ceil(imgOffset.left), Math.ceil(imgOffset.top));
+
+      patternWidth = Math.floor(Math.min(elemWidth, patternWidth));
+      patternHeight = Math.floor(Math.min(elemHeight, patternHeight));
+
+
+      if (bgSize == 'cover') {
+        var imgRatio = imgWidth / imgHeight;
+        var elemRatio = elemWidth / elemHeight;
+        if (imgRatio < elemRatio) {
+          patternWidth = elemWidth;
+          patternHeight = elemWidth / imgRatio; 
+        } else {
+          patternWidth = elemHeight * imgRatio;
+          patternHeight = elemHeight;          
+        }
+      }
+
+      var tmpCanvas = document.createElement("canvas");
+      tmpCanvas.width = patternWidth;
+      tmpCanvas.height = patternHeight;
+      var patternCtx = tmpCanvas.getContext('2d');
+      patternCtx.drawImage(this, 0, 0, patternWidth, patternHeight);
+
+      var pattern = ctx.createPattern(tmpCanvas, 'repeat');
+
+      that.drawRect(Math.floor(patternX), Math.floor(patternY), patternWidth, patternHeight, pattern, Math.ceil(imgOffset.left), Math.ceil(imgOffset.top));
       
       that.drawChildren();
     };

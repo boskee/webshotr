@@ -24,9 +24,9 @@ function data_of( txt )
 }
   
 	function postRender() {
-		var previewImg = Canvas2Image.saveAsPNG(document.getElementById('thecanvas'), true);
-		document.body.appendChild(previewImg);
-		document.getElementById('thecanvas').remove();
+		//var previewImg = Canvas2Image.saveAsPNG(document.getElementById('thecanvas'), true);
+		//document.body.appendChild(previewImg);
+		//document.getElementById('thecanvas').remove();
 	}
 
 function wrapText(context, text, x, y, maxWidth, lineHeight, textIndent, textOffset){
@@ -95,7 +95,6 @@ function wrappedTextHeight(context, text, x, y, maxWidth, lineHeight, textIndent
 (function() {
   //document.body.style.marginBottom = '28px';
   writeToolbarScript('canvas2image.js');
-  writeToolbarScript('canvaslayers.js');
   writeToolbarScript('math.js');
   writeToolbarScript('useragent.js');
   writeToolbarScript('dom.js');
@@ -644,17 +643,5 @@ function getBounds(element) {
 	document.getElementById('thecanvas').height = renderedSize.height;
 	document.getElementById('thecanvas').width = renderedSize.width;
   render();
-		/*var ctx = document.getElementById('thecanvas').getContext("2d");    
-    var img = new Image();
-    img.onload = function(){
-      var patternWidth = 100;
-      var patternHeight = 100;
-      var pattern = ctx.createPattern(this, 'repeat');   
-      ctx.fillStyle = pattern;
-      ctx.translate(100, 100);
-      ctx.fillRect(0, 0, patternWidth, patternHeight);
-      ctx.translate(-100, -100);
-    };
-    img.src = 'http://image.providesupport.com/image/ecomovers/offline-1783088642.gif'; // http://eco-dev.alpha/images/backgrounds/sunken_tl.gif*/
 	});
 }(jQuery));

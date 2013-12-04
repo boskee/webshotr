@@ -1,3 +1,10 @@
+function isObject(val) {
+  var type = typeof val;
+  return type == 'object' && val != null || type == 'function';
+  // return Object(val) === val also works, but is slower, especially if val is
+  // not an object.
+};
+
 var math = {};
 
 /**

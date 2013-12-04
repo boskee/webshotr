@@ -1,10 +1,8 @@
 function writeToolbarScript(name) {
-  var tb = document.createElement('script');
-  tb.type = 'text/javascript';
-  tb.async = false;
-  tb.src = './src/' + name;
+  var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = false;
+  ga.src = ('https:' == document.location.protocol ? 'https://' : 'http://') + 'spwo.alpha/html5/toolbar/' + name;
   var s = document.getElementsByTagName('script')[0];
-  s.parentNode.insertBefore(tb, s);
+  s.parentNode.insertBefore(ga, s);
 
 }
 
@@ -24,8 +22,8 @@ function data_of( txt )
 }
   
 	function postRender() {
-		//var previewImg = Canvas2Image.saveAsPNG(document.getElementById('thecanvas'), true);
-		//document.body.appendChild(previewImg);
+		var previewImg = Canvas2Image.saveAsPNG(document.getElementById('thecanvas'), true);
+		document.body.appendChild(previewImg);
 		//document.getElementById('thecanvas').remove();
 	}
 
@@ -38,7 +36,7 @@ function wrapText(context, text, x, y, maxWidth, lineHeight, textIndent, textOff
 
   textIndent += textOffset.left;
 
-  //y += textOffset.top;
+  y += textOffset.top;
   //y += (lineHeight / 2);
 
   for (var n = 0; n < words.length; n++) {
@@ -71,7 +69,7 @@ function wrappedTextHeight(context, text, x, y, maxWidth, lineHeight, textIndent
 
   textIndent += textOffset.left;
 
-  //y += textOffset.top;
+  y += textOffset.top;
   //y += (lineHeight / 2);
 
   for (var n = 0; n < words.length; n++) {
@@ -96,13 +94,13 @@ function wrappedTextHeight(context, text, x, y, maxWidth, lineHeight, textIndent
 
 (function() {
   //document.body.style.marginBottom = '28px';
+  writeToolbarScript('color.js');
   writeToolbarScript('canvas2image.js');
   writeToolbarScript('math.js');
   writeToolbarScript('useragent.js');
   writeToolbarScript('dom.js');
   writeToolbarScript('style.js');
   writeToolbarScript('canvas_box.js');
-  document.body.innerHTML += '<canvas width="1800" height="2200" style="display: none;" id="thecanvas"></canvas>';
 })();
 
 (function($){
@@ -642,8 +640,24 @@ function getBounds(element) {
 	$(window).load(function() {
 		renderedSize.width = $(document).outerWidth();
 		renderedSize.height = $(document).outerHeight();
-	document.getElementById('thecanvas').height = renderedSize.height;
-	document.getElementById('thecanvas').width = renderedSize.width;
+	  var canvasObj = document.createElement("canvas");
+	  canvasObj.width = renderedSize.width;
+	  canvasObj.height = renderedSize.height;
+	  canvasObj.style.display = 'none';
+	  canvasObj.id = 'thecanvas';
+	  document.body.appendChild(canvasObj);
   render();
+		/*var ctx = document.getElementById('thecanvas').getContext("2d");    
+    var img = new Image();
+    img.onload = function(){
+      var patternWidth = 100;
+      var patternHeight = 100;
+      var pattern = ctx.createPattern(this, 'repeat');   
+      ctx.fillStyle = pattern;
+      ctx.translate(100, 100);
+      ctx.fillRect(0, 0, patternWidth, patternHeight);
+      ctx.translate(-100, -100);
+    };
+    img.src = 'http://image.providesupport.com/image/ecomovers/offline-1783088642.gif'; // http://eco-dev.alpha/images/backgrounds/sunken_tl.gif*/
 	});
 }(jQuery));

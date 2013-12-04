@@ -2,6 +2,8 @@ if (!$) {
   $ = jQuery;
 }
 
+var Color = net.brehaut.Color;
+
 painter.Rect = function(x, y, w, h) {
   return painter.Rect.superClass_.constructor.apply(
       this, [x, y, w, h]);
@@ -16,8 +18,6 @@ painter.Rect.prototype.constructor = painter.Rect;
 painter.Rect.prototype.fill = function(ctx, style) {
   ctx.save();
   ctx.fillStyle = style;
-  console.log(style);
-  console.log("CANVAS PATTERN: " + this.width + " x " + this.height);
   ctx.fillRect(this.left, this.top, this.width, this.height);
   ctx.restore();
 };
@@ -206,6 +206,8 @@ painter.Box.parseStyle = function(element) {
   }
 
   var offset = painter.style.getPageOffset(element);
+  offset.x = Math.round(offset.x);
+  offset.y = Math.round(offset.y);
   
   var style2 = $.extend({}, style3, {
     rect: new math.Rect(offset.x, offset.y, $(element).outerWidth(), $(element).outerHeight()),
@@ -240,6 +242,27 @@ painter.Box.parseStyle = function(element) {
   if (element.tagName == 'SELECT' || element.tagName == 'OPTION') {
     //console.log(element.options);
   } else if (element.tagName == 'INPUT' && (element.type == 'text' || element.type == 'submit')) {
+        var t = element.value;
+        if (style3.textTransform == 'uppercase') {
+          t = t.toUpperCase();
+        } else if (style3.textTransform == 'lowercase') {
+          t = t.toLowerCase();
+        } else if (style3.textTransform == 'capitalize') {
+          t = t.capitalize();
+        }
+        var textOffset = {
+          x: 0,
+          y: 0
+        };
+        textOffset.x = getTextNodeOffsetLeft(element) - (offset.x + style2.padding.left);
+        textOffset.y = getTextNodeOffsetTop(element) - (offset.y + style2.padding.top);
+        style2.text.push({
+          text: t,
+          offset: {
+            left: textOffset.x,
+            top: textOffset.y
+          }
+        });
     /*style2.text = element.value;
     if (style3.textTransform == 'uppercase') {
       style2.text.push(style2.text.toUpperCase());
@@ -265,10 +288,6 @@ painter.Box.parseStyle = function(element) {
           if (t.charAt(0) == ' ') {
             t = t.substring(1, t.length);
           }
-        }
-        if (element.className == 'temperature') {
-          console.log(getTextNodeOffsetLeft(element.childNodes[i]));
-          console.log(offset.x);
         }
         textOffset.x = getTextNodeOffsetLeft(element.childNodes[i]) - (offset.x + style2.padding.left);
         textOffset.y = getTextNodeOffsetTop(element.childNodes[i]) - (offset.y + style2.padding.top);
@@ -704,25 +723,121 @@ painter.Box.prototype.drawRect = function(x, y, width, height, color, shiftX, sh
   }
 };
 
+
+
 painter.Box.prototype.drawBorders = function() {
   if (!this.style.hasBorder) {
     return false;
   }
+
+  var borderColour;
+  var blackColour = Color("#000000");
+
+  // blending values taken from http://stackoverflow.com/questions/4147940/how-do-browsers-determine-which-exact-colors-to-use-for-border-inset-or-outset
   
   if (this.style.border.left > 0 && this.style.borderLeftColor != 'transparent') {
-    this.drawRect(this.style.rect.left, this.style.rect.top, this.style.border.left, this.style.rect.height, this.style.borderLeftColor);
+    borderColour = Color(this.style.borderLeftColor);
+    
+    var borderRect;
+    var rectWidth = this.style.border.left;
+
+    if (this.style.borderLeftStyle == 'inset') {
+      borderColour = borderColour.blend(blackColour, 0.33);
+    }
+    else if (this.style.borderLeftStyle == 'double') {
+      var middleBit = Math.ceil(this.style.border.left / 3);
+      console.log(middleBit);
+      var borderWidth = this.style.border.left - middleBit;
+      var lineWidth = borderWidth / 2;
+      if (lineWidth >= 1) {
+        rectWidth -= (lineWidth + middleBit);
+        var rectHeight = this.style.rect.height - ((lineWidth + middleBit) * 2);
+        this.drawRect(this.style.rect.left + lineWidth + middleBit, this.style.rect.top + lineWidth + middleBit, rectWidth, rectHeight, borderColour.toCSS());
+      }
+      //borderRect = new painter.Rect(this.style.rect.left, this.style.rect.top, rectWidth, this.style.rect.height);
+    }
+    if (!borderRect) {
+      borderRect = new painter.Rect(this.style.rect.left, this.style.rect.top, rectWidth, this.style.rect.height);
+    }
+    this.drawRect(borderRect.left, borderRect.top, borderRect.width, borderRect.height, borderColour.toCSS());
   }
 
   if (this.style.border.right > 0 && this.style.borderRightColor != 'transparent') {
-    this.drawRect((this.style.rect.left + this.style.rect.width) - this.style.border.right, this.style.rect.top, this.style.border.right, this.style.rect.height, this.style.borderRightColor);
+    borderColour = Color(this.style.borderRightColor);
+    
+    var borderRect;
+    var rectWidth = this.style.border.right;
+
+    if (this.style.borderRightStyle == 'outset') {
+      borderColour = borderColour.blend(blackColour, 0.33);
+    }
+    else if (this.style.borderRightStyle == 'double') {
+      var middleBit = Math.ceil(rectWidth / 3);
+      var borderWidth = rectWidth - middleBit;
+      var lineWidth = borderWidth / 2;
+      if (lineWidth >= 1) {
+        rectWidth -= (lineWidth + middleBit);
+        var rectHeight = this.style.rect.height - ((lineWidth + middleBit) * 2);
+        this.drawRect((this.style.rect.left + this.style.rect.width) - this.style.border.right, this.style.rect.top + lineWidth + middleBit, rectWidth, rectHeight, borderColour.toCSS());
+      }
+      borderRect = new painter.Rect((this.style.rect.left + this.style.rect.width) - (this.style.border.right - (lineWidth + middleBit)), this.style.rect.top, rectWidth, this.style.rect.height);
+    }
+    if (!borderRect) {
+      borderRect = new painter.Rect((this.style.rect.left + this.style.rect.width) - this.style.border.right, this.style.rect.top, rectWidth, this.style.rect.height);
+    }
+    this.drawRect(borderRect.left, borderRect.top, borderRect.width, borderRect.height, borderColour.toCSS());
   }
 
   if (this.style.border.top > 0 && this.style.borderTopColor != 'transparent') {
-    this.drawRect(this.style.rect.left, this.style.rect.top, this.style.rect.width, this.style.border.top, this.style.borderTopColor);
+    borderColour = Color(this.style.borderTopColor);
+    
+    var borderRect = null;
+    var rectHeight = this.style.border.top;
+
+    if (this.style.borderTopStyle == 'inset') {
+      borderColour = borderColour.blend(blackColour, 0.33);
+    }
+    else if (this.style.borderTopStyle == 'double') {
+      var middleBit = Math.ceil(this.style.border.top / 3);
+      var borderWidth = this.style.border.top - middleBit;
+      var lineWidth = borderWidth / 2;
+      if (lineWidth >= 1) {
+        rectHeight -= (lineWidth + middleBit);
+        var rectWidth = this.style.rect.width - ((lineWidth + middleBit) * 2);
+        this.drawRect(this.style.rect.left + lineWidth + middleBit, this.style.rect.top + lineWidth + middleBit, rectWidth, rectHeight, borderColour.toCSS());
+      }
+      //borderRect = new painter.Rect(this.style.rect.left, this.style.rect.top, rectWidth, this.style.rect.height);
+    }
+    if (!borderRect) {
+      borderRect = new painter.Rect(this.style.rect.left, this.style.rect.top, this.style.rect.width, rectHeight);
+    }
+    this.drawRect(borderRect.left, borderRect.top, borderRect.width, borderRect.height, borderColour.toCSS());
   }
 
   if (this.style.border.bottom > 0 && this.style.borderBottomColor != 'transparent') {
-    this.drawRect(this.style.rect.left, (this.style.rect.top + this.style.rect.height) - this.style.border.bottom, this.style.rect.width, this.style.border.bottom, this.style.borderBottomColor);
+    borderColour = Color(this.style.borderBottomColor);
+    
+    var borderRect = null;
+    var rectHeight = this.style.border.bottom;
+
+    if (this.style.borderBottomStyle == 'outset') {
+      borderColour = borderColour.blend(blackColour, 0.33);
+    }
+    else if (this.style.borderBottomStyle == 'double') {
+      var middleBit = Math.ceil(this.style.border.bottom / 3);
+      var borderWidth = this.style.border.bottom - middleBit;
+      var lineWidth = borderWidth / 2;
+      if (lineWidth >= 1) {
+        rectHeight -= (lineWidth + middleBit);
+        var rectWidth = this.style.rect.width - ((lineWidth + middleBit) * 2);
+        this.drawRect(this.style.rect.left + lineWidth + middleBit, (this.style.rect.top + this.style.rect.height) - this.style.border.bottom, rectWidth, rectHeight, borderColour.toCSS());
+      }
+      borderRect = new painter.Rect(this.style.rect.left, (this.style.rect.top + this.style.rect.height) - (this.style.border.bottom - (lineWidth + middleBit)), this.style.rect.width, rectHeight);
+    }
+    if (!borderRect) {
+      borderRect = new painter.Rect(this.style.rect.left, (this.style.rect.top + this.style.rect.height) - this.style.border.bottom, this.style.rect.width, this.style.border.bottom);
+    }
+    this.drawRect(borderRect.left, borderRect.top, borderRect.width, borderRect.height, borderColour.toCSS());
   }
 };
 
@@ -826,11 +941,10 @@ painter.Box.prototype.drawBackground = function() {
         }
       }
 
+      patternWidth = Math.min(elemWidth, patternWidth);
+      patternHeight = Math.min(elemHeight, patternHeight);
 
-      patternWidth = Math.floor(Math.min(elemWidth, patternWidth));
-      patternHeight = Math.floor(Math.min(elemHeight, patternHeight));
-
-
+      /* Formulas taken from http://blog.vjeux.com/2013/image/css-container-and-cover.html */
       if (bgSize == 'cover') {
         var imgRatio = imgWidth / imgHeight;
         var elemRatio = elemWidth / elemHeight;
@@ -841,7 +955,20 @@ painter.Box.prototype.drawBackground = function() {
           patternWidth = elemHeight * imgRatio;
           patternHeight = elemHeight;          
         }
+      } else if (bgSize == 'contain') {
+        var imgRatio = imgWidth / imgHeight;
+        var elemRatio = elemWidth / elemHeight;
+        if (imgRatio < elemRatio) {
+          patternWidth = elemHeight * imgRatio;
+          patternHeight = elemHeight; 
+        } else {    
+          patternWidth = elemWidth;
+          patternHeight = elemWidth / imgRatio;      
+        }
       }
+
+      patternWidth = Math.floor(patternWidth);
+      patternHeight = Math.floor(patternHeight);
 
       var tmpCanvas = document.createElement("canvas");
       tmpCanvas.width = patternWidth;

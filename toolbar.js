@@ -1,9 +1,25 @@
-function writeToolbarScript(name) {
-  var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = false;
-  ga.src = ('https:' == document.location.protocol ? 'https://' : 'http://') + 'spwo.alpha/html5/toolbar/' + name;
-  var s = document.getElementsByTagName('script')[0];
-  s.parentNode.insertBefore(ga, s);
+var scriptPath = function () {
+    var scripts = document.getElementsByTagName('SCRIPT');
+    var path = '';
+    if(scripts && scripts.length>0) {
+        for(var i in scripts) {
+            if(scripts[i].src && scripts[i].src.match(/toolbar\.js$/)) {
+                path = scripts[i].src.replace(/(.*)toolbar\.js$/, '$1');
+            }
+        }
+    }
+    return path;
+};
 
+var toolbarScriptPath = './';
+
+function writeToolbarScript(name) {
+  var tb = document.createElement('script');
+  tb.type = 'text/javascript';
+  tb.async = false;
+  tb.src = toolbarScriptPath + 'src/' + name;
+  var s = document.getElementsByTagName('script')[0];
+  s.parentNode.insertBefore(tb, s);
 }
 
 var renderedSize = {width: 0, height: 0};
@@ -94,6 +110,7 @@ function wrappedTextHeight(context, text, x, y, maxWidth, lineHeight, textIndent
 
 (function() {
   //document.body.style.marginBottom = '28px';
+  toolbarScriptPath = scriptPath();
   writeToolbarScript('color.js');
   writeToolbarScript('canvas2image.js');
   writeToolbarScript('math.js');
@@ -646,18 +663,6 @@ function getBounds(element) {
 	  canvasObj.style.display = 'none';
 	  canvasObj.id = 'thecanvas';
 	  document.body.appendChild(canvasObj);
-  render();
-		/*var ctx = document.getElementById('thecanvas').getContext("2d");    
-    var img = new Image();
-    img.onload = function(){
-      var patternWidth = 100;
-      var patternHeight = 100;
-      var pattern = ctx.createPattern(this, 'repeat');   
-      ctx.fillStyle = pattern;
-      ctx.translate(100, 100);
-      ctx.fillRect(0, 0, patternWidth, patternHeight);
-      ctx.translate(-100, -100);
-    };
-    img.src = 'http://image.providesupport.com/image/ecomovers/offline-1783088642.gif'; // http://eco-dev.alpha/images/backgrounds/sunken_tl.gif*/
+  	render();
 	});
 }(jQuery));

@@ -723,7 +723,15 @@ painter.Box.prototype.drawRect = function(x, y, width, height, color, shiftX, sh
   }
 };
 
+function isEven(n) 
+{
+   return isNumber(n) && (n % 2 == 0);
+}
 
+function isNumber(n)
+{
+   return n == parseFloat(n);
+}
 
 painter.Box.prototype.drawBorders = function() {
   if (!this.style.hasBorder) {
@@ -746,14 +754,18 @@ painter.Box.prototype.drawBorders = function() {
     }
     else if (this.style.borderLeftStyle == 'double') {
       var middleBit = Math.ceil(this.style.border.left / 3);
-      console.log(middleBit);
       var borderWidth = this.style.border.left - middleBit;
+      if (!isEven(borderWidth)) {
+        borderWidth += 1;
+        middleBit -= 1;
+      }
       var lineWidth = borderWidth / 2;
       if (lineWidth >= 1) {
         rectWidth -= (lineWidth + middleBit);
         var rectHeight = this.style.rect.height - ((lineWidth + middleBit) * 2);
         this.drawRect(this.style.rect.left + lineWidth + middleBit, this.style.rect.top + lineWidth + middleBit, rectWidth, rectHeight, borderColour.toCSS());
       }
+      console.log("DOUBLE: " + borderWidth);
       //borderRect = new painter.Rect(this.style.rect.left, this.style.rect.top, rectWidth, this.style.rect.height);
     }
     if (!borderRect) {
@@ -774,6 +786,10 @@ painter.Box.prototype.drawBorders = function() {
     else if (this.style.borderRightStyle == 'double') {
       var middleBit = Math.ceil(rectWidth / 3);
       var borderWidth = rectWidth - middleBit;
+      if (!isEven(borderWidth)) {
+        borderWidth += 1;
+        middleBit -= 1;
+      }
       var lineWidth = borderWidth / 2;
       if (lineWidth >= 1) {
         rectWidth -= (lineWidth + middleBit);
@@ -800,6 +816,10 @@ painter.Box.prototype.drawBorders = function() {
     else if (this.style.borderTopStyle == 'double') {
       var middleBit = Math.ceil(this.style.border.top / 3);
       var borderWidth = this.style.border.top - middleBit;
+      if (!isEven(borderWidth)) {
+        borderWidth += 1;
+        middleBit -= 1;
+      }
       var lineWidth = borderWidth / 2;
       if (lineWidth >= 1) {
         rectHeight -= (lineWidth + middleBit);
@@ -826,6 +846,10 @@ painter.Box.prototype.drawBorders = function() {
     else if (this.style.borderBottomStyle == 'double') {
       var middleBit = Math.ceil(this.style.border.bottom / 3);
       var borderWidth = this.style.border.bottom - middleBit;
+      if (!isEven(borderWidth)) {
+        borderWidth += 1;
+        middleBit -= 1;
+      }
       var lineWidth = borderWidth / 2;
       if (lineWidth >= 1) {
         rectHeight -= (lineWidth + middleBit);

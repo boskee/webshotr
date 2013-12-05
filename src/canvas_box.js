@@ -2,6 +2,8 @@ if (!$) {
   $ = jQuery;
 }
 
+var doneOnce = false;
+
 var Color = net.brehaut.Color;
 
 painter.Rect = function(x, y, w, h) {
@@ -684,8 +686,8 @@ painter.Box.prototype.setParent = function(parent) {
   this.parent = parent;
 };
 
-painter.Box.prototype.drawRect = function(x, y, width, height, color, shiftX, shiftY) {  
-  var ctx = document.getElementById('thecanvas').getContext("2d");
+painter.Box.prototype.drawRect = function(x, y, width, height, color, shiftX, shiftY, ctx) {  
+  var ctx = ctx || document.getElementById('thecanvas').getContext("2d");
   shiftX = shiftX || 0;
   shiftY = shiftY || 0;
     
@@ -733,136 +735,269 @@ function isNumber(n)
    return n == parseFloat(n);
 }
 
+painter.Box.prototype.getBorderRect = function(borderSide) {
+  var isHorizontal = (borderSide == 'left' || borderSide == 'right');
+  var oppositeSide = isHorizontal ? (borderSide == 'left' ? 'right' : 'left') : (borderSide == 'top' ? 'bottom' : 'top');
+
+  var borderRect = new math.Rect(
+    this.style.rect.left + (oppositeSide == 'left' ? this.style.rect.width - this.style.border[borderSide] : 0),
+    this.style.rect.top + (oppositeSide == 'top' ? this.style.rect.height - this.style.border[borderSide] : 0),
+    isHorizontal ? this.style.border[borderSide] : this.style.rect.width,
+    isHorizontal ? this.style.rect.height : this.style.border[borderSide]
+  );
+
+  return borderRect;
+}
+
+painter.Box.prototype.doDrawBorder = function(ctx, borderRect, borderSide, borderColor, isSecondary, compositeOperation) {
+  var isHorizontal = (borderSide == 'left' || borderSide == 'right');
+  var horizontalSides = ['left', 'right'];
+  var verticalSides = ['top', 'bottom'];
+
+  var sides = isHorizontal ? verticalSides : horizontalSides;
+
+  this.drawRect(borderRect.left, borderRect.top, borderRect.width, borderRect.height, borderColor.toCSS(), 0, 0, ctx);
+
+  for (var i = 0; i < sides.length; i++) {
+    var side = sides[i];
+    var otherBorder = this.getBorderRect(side);
+    if (otherBorder.width > 0 && otherBorder.height > 0) {
+      ctx.save();
+
+      ctx.fillStyle = borderColor.toCSS();
+      ctx.lineWidth = 0;
+
+      var pathScale = 10;
+      
+      ctx.beginPath();
+
+      var triHeight = isHorizontal ? otherBorder.height : otherBorder.width;
+      var pathWidth = isHorizontal ? borderRect.width : borderRect.height; //this.style.border[borderSide];
+
+
+      var translateX = isHorizontal ? (borderRect.width / 2) : (otherBorder.width / 2);
+      var translateY = isHorizontal ? (otherBorder.height / 2) : (borderRect.height / 2);
+      var rotation = 0;
+      var initX = borderRect.left;
+      var initY = borderRect.top;
+
+      if (isHorizontal) {
+          if (side == 'top') {
+            initY -= otherBorder.height;
+          } else if (side == 'bottom') {
+            initY += borderRect.height;
+          }
+      } else {
+          if (side == 'left') {
+            initX -= otherBorder.width;
+          } else if (side == 'right') {
+            initX += borderRect.width;
+          }
+      }
+
+      if (isHorizontal) {
+        if (side == 'top') {
+          rotation = 180;
+        }
+      } else {
+        if (borderSide == 'bottom') {
+          if (side == 'left') {
+            rotation = 180;
+          } else if (side == 'right') {
+            rotation = 180;
+          }
+        }
+      }
+      translateX += initX;
+      translateY += initY;
+      ctx.translate(translateX, translateY); // now the position (0,0) is found at (250,50)
+      ctx.rotate(((rotation) % 360) * Math.PI / 180); // rotate around the start point of your line
+      ctx.translate(-translateX, -translateY);
+      if (borderSide == 'left' && side == 'top') {
+        ctx.translate(translateX, 0);
+        ctx.scale(-1, 1);
+        ctx.translate(-translateX, 0);
+      } else if (borderSide == 'right' && side == 'bottom') {
+        ctx.translate(translateX, 0);
+        ctx.scale(-1, 1);
+        ctx.translate(-translateX, 0);
+      } else if (borderSide == 'top' && side == 'left') {
+        ctx.translate(translateX, 0);
+        ctx.scale(-1, 1);
+        ctx.translate(-translateX, 0);
+      } else if (borderSide == 'bottom' && side == 'right') {
+        ctx.translate(translateX, 0);
+        ctx.scale(-1, 1);
+        ctx.translate(-translateX, 0);
+      }
+
+      if (isSecondary) {
+          ctx.globalCompositeOperation = compositeOperation || 'source-atop';
+      }
+
+      ctx.moveTo(initX, initY);
+      if (isHorizontal) {
+        ctx.lineTo(initX, initY + triHeight);
+        ctx.lineTo(initX + pathWidth, initY);
+      } else {
+        ctx.lineTo(initX + triHeight, initY);
+        ctx.lineTo(initX, initY + pathWidth);
+      }
+      ctx.lineTo(initX, initY);
+      ctx.fill();
+      ctx.closePath();
+
+      ctx.restore();
+    }
+  }
+}
+
+painter.Box.prototype.drawBorder = function(borderSide) {  
+  var borderColor = this.style["border" + borderSide.capitalize() + "Color"];
+  if (this.style.border[borderSide] > 0 && borderColor != 'transparent') {
+    var ctx = document.getElementById('thecanvas').getContext("2d");
+
+    var isHorizontal = (borderSide == 'left' || borderSide == 'right');
+    var horizontalSides = ['left', 'right'];
+    var verticalSides = ['top', 'bottom'];
+
+    var sides = isHorizontal ? verticalSides : horizontalSides;
+
+    var borderStyle = this.style["border" + borderSide.capitalize() + "Style"];
+
+    var blackColour = Color("#000000");
+    borderColor = Color(borderColor);
+    
+    var borderRect = this.getBorderRect(borderSide);
+    var innerRect;
+    var innerBorderColour;
+
+    for (var i = 0; i < sides.length; i++) {
+      borderRect = math.Rect.difference(borderRect, this.getBorderRect(sides[i]))[0];
+    }
+
+    if (borderStyle == 'inset') {
+      if (borderSide == 'left' || borderSide == 'top') {
+        borderColor = borderColor.blend(blackColour, 0.33);
+      }
+        this.doDrawBorder(ctx, borderRect, borderSide, borderColor);
+    }
+    else if (borderStyle == 'outset') {
+      if (borderSide == 'right' || borderSide == 'bottom') {
+        borderColor = borderColor.blend(blackColour, 0.33);
+      }
+      this.doDrawBorder(ctx, borderRect, borderSide, borderColor);
+    }
+    else if (borderStyle == 'double') {
+      var middleBit = Math.ceil((isHorizontal ? borderRect.width : borderRect.height) / 3);
+      var borderWidth = (isHorizontal ? borderRect.width : borderRect.height) - middleBit;
+      if (!isEven(borderWidth)) {
+        borderWidth += 1;
+        middleBit -= 1;
+      }
+      var lineWidth = borderWidth / 2;
+      if (lineWidth >= 1) {
+        innerRect = borderRect.clone();
+        if (isHorizontal) {
+          var topBorder = this.getBorderRect('top');
+          if (topBorder.height > 0) {
+            innerRect.top = topBorder.top;
+            innerRect.height += topBorder.height;
+          }
+          var bottomBorder = this.getBorderRect('bottom');
+          if (bottomBorder.height > 0) {
+            innerRect.height += bottomBorder.height;
+          }
+          innerRect.left += (borderWidth / 2);
+          innerRect.width = middleBit;
+        } else {
+          var leftBorder = this.getBorderRect('left');
+          if (leftBorder.width > 0) {
+            innerRect.left = leftBorder.left;
+            innerRect.width += leftBorder.width;
+          }
+          var rightBorder = this.getBorderRect('right');
+          if (rightBorder.width > 0) {
+            innerRect.width += rightBorder.width;
+          }
+          innerRect.top += (borderWidth / 2);
+          innerRect.height = middleBit;
+        }
+
+        var tmpCanvas = document.createElement("canvas");
+        tmpCanvas.width = 5000;
+        tmpCanvas.height = 5000;
+        var tmpCtx = tmpCanvas.getContext("2d");
+
+        this.doDrawBorder(tmpCtx, borderRect, borderSide, borderColor);
+        tmpCtx.globalCompositeOperation = 'destination-out';
+        this.doDrawBorder(tmpCtx, innerRect, borderSide, Color('#FF00FF'), true, 'destination-out');
+
+        ctx.drawImage(tmpCanvas, 0, 0);
+        tmpCanvas = null;
+      }
+    }
+    else if (borderStyle == 'ridge' || borderStyle == 'groove') {
+      var innerBorderSize = Math.floor((isHorizontal ? borderRect.width : borderRect.height) / 2);
+      var outerBorderWidth = (isHorizontal ? borderRect.width : borderRect.height) - innerBorderSize;
+      if (innerBorderSize >= 1) {
+        innerRect = borderRect.clone();
+        if (isHorizontal) {
+          if (borderSide == 'left') {
+            innerRect.left += innerBorderSize;
+          }
+          innerRect.width = innerBorderSize;
+        } else {
+          if (borderSide == 'top') {
+            innerRect.top += innerBorderSize;
+          }
+          innerRect.height = innerBorderSize;
+        }
+        if (borderSide == 'right' || borderSide == 'bottom') {
+          if (borderStyle == 'ridge') {
+            innerBorderColour = borderColor;
+            borderColor = borderColor.blend(blackColour, 0.66);
+          } else {
+            innerBorderColour = borderColor.blend(blackColour, 0.66);
+          }
+        } else {
+          if (borderStyle == 'groove') {
+            innerBorderColour = borderColor;
+            borderColor = borderColor.blend(blackColour, 0.66);
+          } else {
+            innerBorderColour = borderColor.blend(blackColour, 0.66);
+          }
+        }
+
+        var tmpCanvas = document.createElement("canvas");
+        tmpCanvas.width = 5000;
+        tmpCanvas.height = 5000;
+        var tmpCtx = tmpCanvas.getContext("2d");
+
+        this.doDrawBorder(tmpCtx, borderRect, borderSide, borderColor);
+        this.doDrawBorder(tmpCtx, innerRect, borderSide, innerBorderColour, true);
+
+        ctx.drawImage(tmpCanvas, 0, 0);
+        tmpCanvas = null;
+      }
+    }
+    else
+    {
+        this.doDrawBorder(ctx, borderRect, borderSide, borderColor);
+    }
+  }
+}
+
 painter.Box.prototype.drawBorders = function() {
   if (!this.style.hasBorder) {
     return false;
   }
 
-  var borderColour;
-  var blackColour = Color("#000000");
-
   // blending values taken from http://stackoverflow.com/questions/4147940/how-do-browsers-determine-which-exact-colors-to-use-for-border-inset-or-outset
-  
-  if (this.style.border.left > 0 && this.style.borderLeftColor != 'transparent') {
-    borderColour = Color(this.style.borderLeftColor);
-    
-    var borderRect;
-    var rectWidth = this.style.border.left;
-
-    if (this.style.borderLeftStyle == 'inset') {
-      borderColour = borderColour.blend(blackColour, 0.33);
-    }
-    else if (this.style.borderLeftStyle == 'double') {
-      var middleBit = Math.ceil(this.style.border.left / 3);
-      var borderWidth = this.style.border.left - middleBit;
-      if (!isEven(borderWidth)) {
-        borderWidth += 1;
-        middleBit -= 1;
-      }
-      var lineWidth = borderWidth / 2;
-      if (lineWidth >= 1) {
-        rectWidth -= (lineWidth + middleBit);
-        var rectHeight = this.style.rect.height - ((lineWidth + middleBit) * 2);
-        this.drawRect(this.style.rect.left + lineWidth + middleBit, this.style.rect.top + lineWidth + middleBit, rectWidth, rectHeight, borderColour.toCSS());
-      }
-      console.log("DOUBLE: " + borderWidth);
-      //borderRect = new painter.Rect(this.style.rect.left, this.style.rect.top, rectWidth, this.style.rect.height);
-    }
-    if (!borderRect) {
-      borderRect = new painter.Rect(this.style.rect.left, this.style.rect.top, rectWidth, this.style.rect.height);
-    }
-    this.drawRect(borderRect.left, borderRect.top, borderRect.width, borderRect.height, borderColour.toCSS());
-  }
-
-  if (this.style.border.right > 0 && this.style.borderRightColor != 'transparent') {
-    borderColour = Color(this.style.borderRightColor);
-    
-    var borderRect;
-    var rectWidth = this.style.border.right;
-
-    if (this.style.borderRightStyle == 'outset') {
-      borderColour = borderColour.blend(blackColour, 0.33);
-    }
-    else if (this.style.borderRightStyle == 'double') {
-      var middleBit = Math.ceil(rectWidth / 3);
-      var borderWidth = rectWidth - middleBit;
-      if (!isEven(borderWidth)) {
-        borderWidth += 1;
-        middleBit -= 1;
-      }
-      var lineWidth = borderWidth / 2;
-      if (lineWidth >= 1) {
-        rectWidth -= (lineWidth + middleBit);
-        var rectHeight = this.style.rect.height - ((lineWidth + middleBit) * 2);
-        this.drawRect((this.style.rect.left + this.style.rect.width) - this.style.border.right, this.style.rect.top + lineWidth + middleBit, rectWidth, rectHeight, borderColour.toCSS());
-      }
-      borderRect = new painter.Rect((this.style.rect.left + this.style.rect.width) - (this.style.border.right - (lineWidth + middleBit)), this.style.rect.top, rectWidth, this.style.rect.height);
-    }
-    if (!borderRect) {
-      borderRect = new painter.Rect((this.style.rect.left + this.style.rect.width) - this.style.border.right, this.style.rect.top, rectWidth, this.style.rect.height);
-    }
-    this.drawRect(borderRect.left, borderRect.top, borderRect.width, borderRect.height, borderColour.toCSS());
-  }
-
-  if (this.style.border.top > 0 && this.style.borderTopColor != 'transparent') {
-    borderColour = Color(this.style.borderTopColor);
-    
-    var borderRect = null;
-    var rectHeight = this.style.border.top;
-
-    if (this.style.borderTopStyle == 'inset') {
-      borderColour = borderColour.blend(blackColour, 0.33);
-    }
-    else if (this.style.borderTopStyle == 'double') {
-      var middleBit = Math.ceil(this.style.border.top / 3);
-      var borderWidth = this.style.border.top - middleBit;
-      if (!isEven(borderWidth)) {
-        borderWidth += 1;
-        middleBit -= 1;
-      }
-      var lineWidth = borderWidth / 2;
-      if (lineWidth >= 1) {
-        rectHeight -= (lineWidth + middleBit);
-        var rectWidth = this.style.rect.width - ((lineWidth + middleBit) * 2);
-        this.drawRect(this.style.rect.left + lineWidth + middleBit, this.style.rect.top + lineWidth + middleBit, rectWidth, rectHeight, borderColour.toCSS());
-      }
-      //borderRect = new painter.Rect(this.style.rect.left, this.style.rect.top, rectWidth, this.style.rect.height);
-    }
-    if (!borderRect) {
-      borderRect = new painter.Rect(this.style.rect.left, this.style.rect.top, this.style.rect.width, rectHeight);
-    }
-    this.drawRect(borderRect.left, borderRect.top, borderRect.width, borderRect.height, borderColour.toCSS());
-  }
-
-  if (this.style.border.bottom > 0 && this.style.borderBottomColor != 'transparent') {
-    borderColour = Color(this.style.borderBottomColor);
-    
-    var borderRect = null;
-    var rectHeight = this.style.border.bottom;
-
-    if (this.style.borderBottomStyle == 'outset') {
-      borderColour = borderColour.blend(blackColour, 0.33);
-    }
-    else if (this.style.borderBottomStyle == 'double') {
-      var middleBit = Math.ceil(this.style.border.bottom / 3);
-      var borderWidth = this.style.border.bottom - middleBit;
-      if (!isEven(borderWidth)) {
-        borderWidth += 1;
-        middleBit -= 1;
-      }
-      var lineWidth = borderWidth / 2;
-      if (lineWidth >= 1) {
-        rectHeight -= (lineWidth + middleBit);
-        var rectWidth = this.style.rect.width - ((lineWidth + middleBit) * 2);
-        this.drawRect(this.style.rect.left + lineWidth + middleBit, (this.style.rect.top + this.style.rect.height) - this.style.border.bottom, rectWidth, rectHeight, borderColour.toCSS());
-      }
-      borderRect = new painter.Rect(this.style.rect.left, (this.style.rect.top + this.style.rect.height) - (this.style.border.bottom - (lineWidth + middleBit)), this.style.rect.width, rectHeight);
-    }
-    if (!borderRect) {
-      borderRect = new painter.Rect(this.style.rect.left, (this.style.rect.top + this.style.rect.height) - this.style.border.bottom, this.style.rect.width, this.style.border.bottom);
-    }
-    this.drawRect(borderRect.left, borderRect.top, borderRect.width, borderRect.height, borderColour.toCSS());
-  }
+  this.drawBorder('left');
+  this.drawBorder('top');
+  this.drawBorder('right');
+  this.drawBorder('bottom');
 };
 
 painter.Box.prototype.drawBackground = function() {

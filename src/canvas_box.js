@@ -6,6 +6,79 @@ var doneOnce = false;
 
 var Color = net.brehaut.Color;
 
+/**
+ * Writes an image into a canvas taking into
+ * account the backing store pixel ratio and
+ * the device pixel ratio.
+ *
+ * @author Paul Lewis
+ * @param {Object} opts The params for drawing an image to the canvas
+ */
+/*function drawImage(opts) {
+
+    if(!opts.canvas) {
+        throw("A canvas is required");
+    }
+    if(!opts.image) {
+        throw("Image is required");
+    }
+
+    // get the canvas and context
+    var canvas = opts.canvas,
+        context = canvas.getContext('2d'),
+        image = opts.image,
+
+    // now default all the dimension info
+        srcx = opts.srcx || 0,
+        srcy = opts.srcy || 0,
+        srcw = opts.srcw || image.naturalWidth,
+        srch = opts.srch || image.naturalHeight,
+        desx = opts.desx || srcx,
+        desy = opts.desy || srcy,
+        desw = opts.desw || srcw,
+        desh = opts.desh || srch,
+        auto = opts.auto,
+
+    // finally query the various pixel ratios
+        devicePixelRatio = window.devicePixelRatio || 1,
+        backingStoreRatio = context.webkitBackingStorePixelRatio ||
+                            context.mozBackingStorePixelRatio ||
+                            context.msBackingStorePixelRatio ||
+                            context.oBackingStorePixelRatio ||
+                            context.backingStorePixelRatio || 1,
+
+        ratio = devicePixelRatio / backingStoreRatio;
+
+    // ensure we have a value set for auto.
+    // If auto is set to false then we
+    // will simply not upscale the canvas
+    // and the default behaviour will be maintained
+    if (typeof auto === 'undefined') {
+        auto = true;
+    }
+
+    // upscale the canvas if the two ratios don't match
+    if (auto && devicePixelRatio !== backingStoreRatio) {
+
+        var oldWidth = canvas.width;
+        var oldHeight = canvas.height;
+
+        canvas.width = oldWidth * ratio;
+        canvas.height = oldHeight * ratio;
+
+        canvas.style.width = oldWidth + 'px';
+        canvas.style.height = oldHeight + 'px';
+
+        // now scale the context to counter
+        // the fact that we've manually scaled
+        // our canvas element
+        context.scale(ratio, ratio);
+
+    }
+
+    context.drawImage(image, srcx, srcy, srcw, srch, desx, desy, desw, desh);
+}*/
+
 painter.Rect = function(x, y, w, h) {
   return painter.Rect.superClass_.constructor.apply(
       this, [x, y, w, h]);
@@ -116,6 +189,27 @@ function setSelectionRange(el, textNode, start, end) {
   }
 }
 
+function getTextNodeWidth(textNode) {
+    var selWidth = 0;
+    if (document.selection && document.selection.type == "Text") {
+        var textRange = document.selection.createRange();
+        selWidth = textRange.boundingWidth;
+    } else if (document.createRange && window.getSelection) {
+      var range = document.createRange();
+      range.selectNode(textNode);
+      var rectList = range.getClientRects();
+      if (rectList.length > 0) {
+        var rectLeft = rectList[0].left;
+        var rectRight = 0;
+        for (var i = 0; i < rectList.length; i++) {
+          rectRight = Math.max(rectRight, rectList[i].right);
+        }
+        selWidth = rectRight - rectLeft;
+      }
+    }
+    return selWidth;
+}
+
 function getTextNodeHeight(textNode) {
     var selHeight = 0;
     if (document.selection && document.selection.type == "Text") {
@@ -129,7 +223,7 @@ function getTextNodeHeight(textNode) {
         var rectTop = rectList[0].top;
         var rectBottom = 0;
         for (var i = 0; i < rectList.length; i++) {
-          rectBottom = rectList[i].bottom;
+          rectBottom = Math.max(rectBottom, rectList[i].bottom);
         }
         selHeight = rectBottom - rectTop;
       }
@@ -263,7 +357,8 @@ painter.Box.parseStyle = function(element) {
           offset: {
             left: textOffset.x,
             top: textOffset.y
-          }
+          },
+          width: getTextNodeWidth(element)
         });
     /*style2.text = element.value;
     if (style3.textTransform == 'uppercase') {
@@ -298,7 +393,8 @@ painter.Box.parseStyle = function(element) {
           offset: {
             left: textOffset.x,
             top: textOffset.y
-          }
+          },
+          width: getTextNodeWidth(element)
         });
       }
     }
@@ -530,7 +626,11 @@ painter.Box.prototype.drawChildren = function() {
       document.body.appendChild(copy);
       copy.width = w;
       copy.height = h;
-      copy.getContext("2d").drawImage(this, 0, 0, w, h);
+      /* This is neccessary for (semi)transparent images to be drawn on correct background */
+      var imageRectBg = ctx.getImageData(x, y, w, h);
+      copy.getContext("2d").putImageData(imageRectBg, 0, 0);
+
+      copy.getContext("2d").drawImage(this, 0, 0, this.naturalWidth, this.naturalHeight, 0, 0, w, h);
 
       var croppedData = copy.getContext("2d").getImageData(0, 0, vW, vH);
       ctx.putImageData(croppedData, x, y);
@@ -627,6 +727,7 @@ painter.Box.prototype.drawText = function() {
   ctx.save();
   
   ctx.fillStyle = this.style.color;
+  ctx.strokeStyle = this.style.color;
   ctx.font = this.style.fontWeight + " " + this.style.fontSize + "/" + this.style.lineHeight + " " + this.style.fontFamily;
   //ctx.textAlign = this.style.textAlign;
   ctx.textBaseline = 'top';
@@ -658,19 +759,20 @@ painter.Box.prototype.drawText = function() {
   for (var i = 0, j = this.style.text.length; i < j; i++) {
     //console.log(this.style.text[i].offset);
     var rct = rect.clone();
-    rct.width = parseInt(this.style.width, 10);
+    //rct.width = parseInt(this.style.width, 10);
+    rct.width = this.style.text[i].width;
 
     if (rct.width > rect.width) {
       console.log(rect.width);
       var widthDiff = rct.width - rect.width;
       console.log(widthDiff);
-      var textHeight = wrappedTextHeight(ctx, this.style.text[i].text, rct.left, rct.top, rct.width, lh, this.style.textIndent, this.style.text[i].offset);
+      var textHeight = wrappedTextHeight(ctx, this.style.text[i].text, rct.left, rct.top, rct.width, lh, this.style.textIndent, this.style.text[i].offset, this.style.textDecoration);
       console.log(textHeight);
       var slice = ctx.getImageData(rct.left + widthDiff, rct.top, widthDiff, textHeight);
-      wrapText(ctx, this.style.text[i].text, rct.left, rct.top, rct.width, lh, this.style.textIndent, this.style.text[i].offset);
+      wrapText(ctx, this.style.text[i].text, rct.left, rct.top, rct.width, lh, this.style.textIndent, this.style.text[i].offset, this.style.textDecoration);
       ctx.putImageData(slice, rct.left + widthDiff, rct.top);
     } else {
-      wrapText(ctx, this.style.text[i].text, rct.left, rct.top, rct.width, lh, this.style.textIndent, this.style.text[i].offset);
+      wrapText(ctx, this.style.text[i].text, rct.left, rct.top, rct.width, lh, this.style.textIndent, this.style.text[i].offset, this.style.textDecoration);
     }
 
     //wrapText(ctx, this.style.text[i].text, rct.left, rct.top, rct.width, parseFloat(this.style.lineHeight, 10), this.style.textIndent);

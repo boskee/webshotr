@@ -43,7 +43,31 @@ function data_of( txt )
 		//document.getElementById('thecanvas').remove();
 	}
 
-function wrapText(context, text, x, y, maxWidth, lineHeight, textIndent, textOffset){
+var underline = function(ctx, x, y, width, thickness) {
+  ctx.lineWidth = thickness;
+  ctx.beginPath();
+  ctx.moveTo(x,y - 1.5);
+  ctx.lineTo(x+width,y - 1.5);
+  ctx.stroke();
+}
+
+var overline = function(ctx, x, y, width, thickness) {
+  ctx.lineWidth = thickness;
+  ctx.beginPath();
+  ctx.moveTo(x,y + .5);
+  ctx.lineTo(x+width,y + .5);
+  ctx.stroke();
+}
+
+var line_through = function(ctx, x, y, width, thickness) {
+  ctx.lineWidth = thickness;
+  ctx.beginPath();
+  ctx.moveTo(x,y + .5);
+  ctx.lineTo(x+width,y + .5);
+  ctx.stroke();
+}
+
+function wrapText(context, text, x, y, maxWidth, lineHeight, textIndent, textOffset, decoration){
   var words = text.split(" ");
   var line = "";
   var actualWidth = 0;
@@ -61,10 +85,17 @@ function wrapText(context, text, x, y, maxWidth, lineHeight, textIndent, textOff
       var testWidth = metrics.width + textIndent;
       if (testWidth > maxWidth) {
           metrics = context.measureText(line);
-          testWidth = metrics.width + textIndent;
+          testWidth = metrics.width;
           context.fillText(data_of({data:line}), x + textIndent, y);
           line = words[n] + " ";
           y += lineHeight;
+          if (decoration == 'underline') {
+          	underline(context, x + textIndent, y, testWidth, 1);
+          } else if (decoration == 'overline') {
+          	overline(context, x + textIndent, y - lineHeight, testWidth, 1);
+          } else if (decoration == 'line-through') {
+          	line_through(context, x + textIndent, y - (lineHeight / 2), testWidth, 1);
+          }
           textIndent = 0;
       }
       else {
@@ -73,6 +104,18 @@ function wrapText(context, text, x, y, maxWidth, lineHeight, textIndent, textOff
       actualWidth = Math.max(actualWidth, testWidth);
   }
   context.fillText(data_of({data:line}), x + textIndent, y);
+  y += lineHeight;
+  if (decoration != 'none') {
+	  var metrics = context.measureText(data_of({data:line}));
+	  var testWidth = metrics.width;
+  if (decoration == 'underline') {
+  	underline(context, x + textIndent, y, testWidth, 1);
+  } else if (decoration == 'overline') {
+          	overline(context, x + textIndent, y - lineHeight, testWidth, 1);
+          } else if (decoration == 'line-through') {
+          	line_through(context, x + textIndent, y - (lineHeight / 2), testWidth, 1);
+          }
+	}
   return actualWidth;
 }	
 

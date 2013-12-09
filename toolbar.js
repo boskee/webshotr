@@ -31,9 +31,9 @@ function data_of( txt )
   data = data.replace(/[\t\n\r ]+/g, " ");
   /*if (data.charAt(0) == " ")
     data = data.substring(1, data.length);
-  */
   if (data.charAt(data.length - 1) == " ")
     data = data.substring(0, data.length - 1);
+  */
   return data;
 }
   
@@ -67,7 +67,7 @@ var line_through = function(ctx, x, y, width, thickness) {
   ctx.stroke();
 }
 
-function wrapText(context, text, x, y, maxWidth, lineHeight, textIndent, textOffset, decoration){
+function wrapText(context, text, x, y, maxWidth, lineHeight, textIndent, textOffset, textSize, decorations){
   var words = text.split(" ");
   var line = "";
   var actualWidth = 0;
@@ -87,15 +87,22 @@ function wrapText(context, text, x, y, maxWidth, lineHeight, textIndent, textOff
           metrics = context.measureText(line);
           testWidth = metrics.width;
           context.fillText(data_of({data:line}), x + textIndent, y);
-          line = words[n] + " ";
           y += lineHeight;
-          if (decoration == 'underline') {
-          	underline(context, x + textIndent, y, testWidth, 1);
-          } else if (decoration == 'overline') {
-          	overline(context, x + textIndent, y - lineHeight, testWidth, 1);
-          } else if (decoration == 'line-through') {
-          	line_through(context, x + textIndent, y - (lineHeight / 2), testWidth, 1);
-          }
+  		  if (decorations.length > 0) {
+		  var metrics2 = context.measureText((line.charAt(line.length - 1) == " ") ? line.substring(0, line.length - 1) : line);
+		  var testWidth2 = metrics2.width;
+	          for (var i = 0; i < decorations.length; i++) {
+	          	  var decoration = decorations[i];
+		          if (decoration == 'underline') {
+		          	underline(context, x + textIndent, y, testWidth2, 1);
+		          } else if (decoration == 'overline') {
+		          	overline(context, x + textIndent, y - lineHeight, testWidth2, 1);
+		          } else if (decoration == 'line-through') {
+		          	line_through(context, x + textIndent, y - (lineHeight / 2), testWidth2, 1);
+		          }
+		      }
+		  }
+          line = words[n] + " ";
           textIndent = 0;
       }
       else {
@@ -105,19 +112,82 @@ function wrapText(context, text, x, y, maxWidth, lineHeight, textIndent, textOff
   }
   context.fillText(data_of({data:line}), x + textIndent, y);
   y += lineHeight;
-  if (decoration != 'none') {
+  if (decorations.length > 0) {
 	  var metrics = context.measureText(data_of({data:line}));
 	  var testWidth = metrics.width;
-  if (decoration == 'underline') {
-  	underline(context, x + textIndent, y, testWidth, 1);
-  } else if (decoration == 'overline') {
-          	overline(context, x + textIndent, y - lineHeight, testWidth, 1);
-          } else if (decoration == 'line-through') {
-          	line_through(context, x + textIndent, y - (lineHeight / 2), testWidth, 1);
-          }
+          for (var i = 0; i < decorations.length; i++) {
+          	  var decoration = decorations[i];
+	          if (decoration == 'underline') {
+	          	underline(context, x + textIndent, y, testWidth, 1);
+	          } else if (decoration == 'overline') {
+	          	overline(context, x + textIndent, y - lineHeight, testWidth, 1);
+	          } else if (decoration == 'line-through') {
+	          	line_through(context, x + textIndent, y - (lineHeight / 2), testWidth, 1);
+	          }
+	      }
 	}
   return actualWidth;
-}	
+}
+
+    // font-defined metrics
+    function getFontMetrics(metrics) {
+      var s = "font.onload() called - loaded font information:<br>{<br>&nbsp;&nbsp;";
+      var information = [];
+      for(attr in metrics) { information.push(attr + " : " + metrics[attr]); }
+      s += information.join(",<br>&nbsp;&nbsp;") + "<br>}<br>";
+      return s;
+    }
+    
+    // specific metrics
+    function getTextMetrics(fontSize, metrics) {
+      information = [];
+      for(attr in metrics) {
+        if(attr!='bounds') { information.push(attr + " : " + metrics[attr]); }
+        else {
+          var s = attr + " : {";
+          var bds = [];
+          for(m in metrics[attr]) { bds.push(m+":"+metrics[attr][m]); }
+          s += bds.join(", ") + "}";
+          information.push(s);
+        }
+      }
+      var s = "metrics for string \"<span style='color: #669; font-size:"+fontSize+"px;'>"+textString+"</span>\""+
+           "(at "+fontSize+"px):<br>{<br>&nbsp;&nbsp;";
+      s += information.join(",<br>&nbsp;&nbsp;") + "<br>}";
+      return s;
+    }
+
+
+
+/*function load_sys(textString, fontFamily, fontSize) {
+  // let's load a font!
+  var font = new Font();
+
+  fontSize = parseInt(fontSize, 10);
+
+  // set up the onload handler
+  font.onload = function() {
+    // create a paragraph of text, styled with this font, showing all metrics
+    var p = document.createElement("P");
+    document.body.appendChild(p);
+    //var p = document.getElementById("fontinfo_sys");
+    p.style.fontFamily = "'" + font.fontFamily + "'";
+    p.style.fontSize = fontSize;
+    
+    return font.measureText(textString, fontSize);
+
+    // get font-specific as well as text-specific metrics for this font
+    p.innerHTML = "Because we do not have access to the system font file, font-declared metrics are not available.<br>" + 
+                  getTextMetrics(fontSize, font.measureText(textString, fontSize));
+  }
+
+  // error handler
+  font.onerror = function(err) { alert(err); }
+
+  // then kick off font loading by assigning the "src" property
+  font.fontFamily = fontFamily;
+  font.src = font.fontFamily;
+}*/
 
 function wrappedTextHeight(context, text, x, y, maxWidth, lineHeight, textIndent, textOffset){
   var words = text.split(" ");
@@ -151,8 +221,9 @@ function wrappedTextHeight(context, text, x, y, maxWidth, lineHeight, textIndent
   return Math.ceil(actualHeight);
 }	
 
-(function() {
+(function($) {
   toolbarScriptPath = scriptPath();
+  writeToolbarScript('Font.js');
   writeToolbarScript('color.js');
   writeToolbarScript('canvas2image.js');
   writeToolbarScript('math.js');
@@ -160,9 +231,6 @@ function wrappedTextHeight(context, text, x, y, maxWidth, lineHeight, textIndent
   writeToolbarScript('dom.js');
   writeToolbarScript('style.js');
   writeToolbarScript('canvas_box.js');
-})();
-
-(function($){
 	// Parse and load a sample document
 	$(window).load(function() {
 		renderedSize.width = $(document).outerWidth();

@@ -293,6 +293,8 @@ painter.Box = function(dimensions) {
   this.renderIndex = 0;
   
   this.renderQueue = -1;
+
+  this.actualTextDecorations = [];
 };
 
 painter.Box.parseStyle = function(element) {
@@ -304,7 +306,7 @@ painter.Box.parseStyle = function(element) {
   var offset = painter.style.getPageOffset(element);
   offset.x = Math.round(offset.x);
   offset.y = Math.round(offset.y);
-  
+
   var style2 = $.extend({}, style3, {
     rect: new math.Rect(offset.x, offset.y, $(element).outerWidth(), $(element).outerHeight()),
     border: {
@@ -358,7 +360,10 @@ painter.Box.parseStyle = function(element) {
             left: textOffset.x,
             top: textOffset.y
           },
-          width: getTextNodeWidth(element)
+          left: getTextNodeOffsetLeft(element),
+          top: getTextNodeOffsetTop(element),
+          width: getTextNodeWidth(element),
+          height: getTextNodeHeight(element)
         });
     /*style2.text = element.value;
     if (style3.textTransform == 'uppercase') {
@@ -394,7 +399,10 @@ painter.Box.parseStyle = function(element) {
             left: textOffset.x,
             top: textOffset.y
           },
-          width: getTextNodeWidth(element)
+          left: getTextNodeOffsetLeft(element.childNodes[i]),
+          top: getTextNodeOffsetTop(element.childNodes[i]),
+          width: getTextNodeWidth(element.childNodes[i]),
+          height: getTextNodeHeight(element.childNodes[i])
         });
       }
     }
@@ -452,6 +460,7 @@ painter.Box.prototype.render = function() {
     }
     return;
   }
+
   var ctx = document.getElementById('thecanvas').getContext("2d");
 
   ctx.globalAlpha = this.style.opacity;
@@ -756,24 +765,50 @@ painter.Box.prototype.drawText = function() {
   
 //console.log(this.style.text);
 
+  //var fontArr = this.style.fontFamily.split(',');
+
+  //load_sys(fontArr[0], this.style.fontSize);
+
   for (var i = 0, j = this.style.text.length; i < j; i++) {
     //console.log(this.style.text[i].offset);
     var rct = rect.clone();
     //rct.width = parseInt(this.style.width, 10);
     rct.width = this.style.text[i].width;
+    rct.height = this.style.text[i].height;
+    rct.left = this.style.text[i].left;
+    rct.top = this.style.text[i].top;
 
-    if (rct.width > rect.width) {
+    //if (rct.width > rect.width) {
+      console.log(this.style.text[i].text);
       console.log(rect.width);
+      var textHeight = wrappedTextHeight(ctx, this.style.text[i].text, rct.left, rct.top, rct.width, lh, this.style.textIndent, this.style.text[i].offset, parseInt(this.style.fontSize, 10), this.actualTextDecorations);
+      var differences = [];
+      var slices = [];
+      if (this.style.visibleBox) {
+        /*if (!rect.intersection(this.style.visibleBox)) {
+          return false;
+        }*/
+        differences = math.Rect.difference(rct, rect);
+        console.log(differences);
+        for (var k = 0; k < differences.length; k++) {
+          slices.push(ctx.getImageData(differences[k].left, differences[k].top, differences[k].width, differences[k].height));
+        }
+      }
       var widthDiff = rct.width - rect.width;
       console.log(widthDiff);
-      var textHeight = wrappedTextHeight(ctx, this.style.text[i].text, rct.left, rct.top, rct.width, lh, this.style.textIndent, this.style.text[i].offset, this.style.textDecoration);
       console.log(textHeight);
-      var slice = ctx.getImageData(rct.left + widthDiff, rct.top, widthDiff, textHeight);
-      wrapText(ctx, this.style.text[i].text, rct.left, rct.top, rct.width, lh, this.style.textIndent, this.style.text[i].offset, this.style.textDecoration);
-      ctx.putImageData(slice, rct.left + widthDiff, rct.top);
-    } else {
-      wrapText(ctx, this.style.text[i].text, rct.left, rct.top, rct.width, lh, this.style.textIndent, this.style.text[i].offset, this.style.textDecoration);
-    }
+      console.log("VISIBLE BOX:");
+      console.log(rect);
+      //var slice = ctx.getImageData(rct.left + widthDiff, rct.top, widthDiff, textHeight);
+      wrapText(ctx, this.style.text[i].text, rct.left, rct.top, rct.width, lh, 0, { left: 0, top: 0}, parseInt(this.style.fontSize, 10), this.actualTextDecorations);
+      if (slices.length > 0) {
+        for (var l = 0; l < differences.length; l++) {
+          ctx.putImageData(slices[l], differences[l].left, differences[l].top);
+        }
+      }
+    //} else {
+    //  wrapText(ctx, this.style.text[i].text, rct.left, rct.top, rct.width, lh, this.style.textIndent, this.style.text[i].offset, parseInt(this.style.fontSize, 10), this.actualTextDecorations);
+    //}
 
     //wrapText(ctx, this.style.text[i].text, rct.left, rct.top, rct.width, parseFloat(this.style.lineHeight, 10), this.style.textIndent);
   }
@@ -1247,6 +1282,38 @@ painter.Box.prototype.drawBackground = function() {
   }
 };
 
+function inArray(needle, haystack) {
+    var length = haystack.length;
+    for(var i = 0; i < length; i++) {
+        if(haystack[i] == needle) return true;
+    }
+    return false;
+}
+
+Array.prototype.clone = function() {
+var copy = []
+for (var j = 0; j < this.length; j++) {
+  copy.push(this[j]);
+}
+return copy;
+};
+
+painter.Box.prototype.determineTextDecorations = function(parent) {
+  var actualTextDecorations = [];
+  var ignoredDisplays = ['table', 'inline-block', 'inline-table'];
+  if (parent && parent.nodeName != 'HTML') {
+    if (this.style.position != 'absolute' && this.style.position != 'fixed' && !inArray(this.style.display, ignoredDisplays)) {
+      actualTextDecorations = boxRefs[parent.getAttribute('veryUniqueId')].actualTextDecorations.clone() || [];
+    }
+  }
+  if (this.style.textDecoration != 'none') {
+    if (!inArray(this.style.textDecoration, actualTextDecorations)) {
+      actualTextDecorations.push(this.style.textDecoration);
+    }
+  }
+  this.actualTextDecorations = actualTextDecorations;
+};
+
 painter.Box.prototype.addChild = function(child) {
   if (!child || !(child instanceof painter.Box)) {
     return;
@@ -1290,6 +1357,7 @@ painter.Box.fromDom = function(element) {
 
   var box_ = new painter.Box({});
   box_.setStyle(painter.Box.parseStyle(element));
+
   var veryUniqueId = uniqueid();
   element.setAttribute('veryUniqueId', veryUniqueId);
   boxRefs[veryUniqueId] = box_;
@@ -1297,6 +1365,7 @@ painter.Box.fromDom = function(element) {
   if (offsetParent && offsetParent.nodeName != 'HTML') {
     boxRefs[offsetParent.getAttribute('veryUniqueId')].addChild(box_);
   }
+  box_.determineTextDecorations(element.parentNode);
 
   /*if (element.className == 'social') {
     console.log(painter.style.getOffsetParent(element));

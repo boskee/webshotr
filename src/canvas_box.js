@@ -2,82 +2,7 @@ if (!$) {
   $ = jQuery;
 }
 
-var doneOnce = false;
-
 var Color = net.brehaut.Color;
-
-/**
- * Writes an image into a canvas taking into
- * account the backing store pixel ratio and
- * the device pixel ratio.
- *
- * @author Paul Lewis
- * @param {Object} opts The params for drawing an image to the canvas
- */
-/*function drawImage(opts) {
-
-    if(!opts.canvas) {
-        throw("A canvas is required");
-    }
-    if(!opts.image) {
-        throw("Image is required");
-    }
-
-    // get the canvas and context
-    var canvas = opts.canvas,
-        context = canvas.getContext('2d'),
-        image = opts.image,
-
-    // now default all the dimension info
-        srcx = opts.srcx || 0,
-        srcy = opts.srcy || 0,
-        srcw = opts.srcw || image.naturalWidth,
-        srch = opts.srch || image.naturalHeight,
-        desx = opts.desx || srcx,
-        desy = opts.desy || srcy,
-        desw = opts.desw || srcw,
-        desh = opts.desh || srch,
-        auto = opts.auto,
-
-    // finally query the various pixel ratios
-        devicePixelRatio = window.devicePixelRatio || 1,
-        backingStoreRatio = context.webkitBackingStorePixelRatio ||
-                            context.mozBackingStorePixelRatio ||
-                            context.msBackingStorePixelRatio ||
-                            context.oBackingStorePixelRatio ||
-                            context.backingStorePixelRatio || 1,
-
-        ratio = devicePixelRatio / backingStoreRatio;
-
-    // ensure we have a value set for auto.
-    // If auto is set to false then we
-    // will simply not upscale the canvas
-    // and the default behaviour will be maintained
-    if (typeof auto === 'undefined') {
-        auto = true;
-    }
-
-    // upscale the canvas if the two ratios don't match
-    if (auto && devicePixelRatio !== backingStoreRatio) {
-
-        var oldWidth = canvas.width;
-        var oldHeight = canvas.height;
-
-        canvas.width = oldWidth * ratio;
-        canvas.height = oldHeight * ratio;
-
-        canvas.style.width = oldWidth + 'px';
-        canvas.style.height = oldHeight + 'px';
-
-        // now scale the context to counter
-        // the fact that we've manually scaled
-        // our canvas element
-        context.scale(ratio, ratio);
-
-    }
-
-    context.drawImage(image, srcx, srcy, srcw, srch, desx, desy, desw, desh);
-}*/
 
 painter.Rect = function(x, y, w, h) {
   return painter.Rect.superClass_.constructor.apply(
@@ -107,89 +32,7 @@ String.prototype.capitalize = function() {
     return this.charAt(0).toUpperCase() + this.slice(1);
 }
 
-function getTextNodesIn(node, start) {
-  var textNodes = [];
-  var start = start || 0,
-      end = start;
-  if (node.nodeType == 3) {
-    end += node.length;
-    textNodes.push([node, start, end]);
-  } else {
-    var children = node.childNodes;
-    for (var i = 0, len = children.length; i < len; ++i) {
-      textNodes.push.apply(textNodes, getTextNodesIn(children[i]));
-    }
-  }
-  return textNodes;
-}
-
-function setSelectionRange2(el, start, end) {
-  if (document.createRange && window.getSelection) {
-    var range = document.createRange();
-    range.selectNodeContents(el);
-    var textNodes = getTextNodesIn(el);
-    var foundStart = false;
-    var charCount = 0, endCharCount;
-
-    for (var i = 0, textNode; textNode = textNodes[i++]; ) {
-      endCharCount = charCount + textNode.length;
-      if (!foundStart && start >= charCount
-              && (start < endCharCount ||
-              (start == endCharCount && i < textNodes.length))) {
-        range.setStart(textNode, start - charCount);
-        foundStart = true;
-      }
-      if (foundStart && end <= endCharCount) {
-        range.setEnd(textNode, end - charCount);
-        break;
-      }
-      charCount = endCharCount;
-    }
-
-    var sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
-} else if (document.selection && document.body.createTextRange) {
-    var textRange = document.body.createTextRange();
-    textRange.moveToElementText(el);
-    textRange.collapse(true);
-    textRange.moveEnd("character", end);
-    textRange.moveStart("character", start);
-    textRange.select();
-  }
-}
-
-function setSelectionRange(el, textNode, start, end) {
-  if (document.createRange && window.getSelection) {
-    var range = document.createRange();
-    range.selectNodeContents(el);
-    var foundStart = false;
-    var charCount = 0, endCharCount;
-
-    endCharCount = charCount + textNode.length;
-    if (!foundStart && start >= charCount
-      && (start < endCharCount ||
-      (start == endCharCount && i < textNodes.length))) {
-      range.setStart(textNode, start - charCount);
-      foundStart = true;
-    }
-    if (foundStart && end <= endCharCount) {
-      range.setEnd(textNode, end - charCount);
-    }
-    charCount = endCharCount;
-
-    return range;
-  } else if (document.selection && document.body.createTextRange) {
-    var textRange = document.body.createTextRange();
-    textRange.moveToElementText(el);
-    textRange.collapse(true);
-    textRange.moveEnd("character", end);
-    textRange.moveStart("character", start);
-    textRange.select();
-  }
-}
-
-function getTextNodeWidth(textNode) {
+function getTextNodeWidth(textNode, style) {
     var selWidth = 0;
     if (document.selection && document.selection.type == "Text") {
         var textRange = document.selection.createRange();
@@ -199,7 +42,7 @@ function getTextNodeWidth(textNode) {
       range.selectNode(textNode);
       var rectList = range.getClientRects();
       if (rectList.length > 0) {
-        var rectLeft = getTextNodeOffsetLeft(textNode).left;
+        var rectLeft = getTextNodeOffsetLeft(textNode, style).left;
         var rectRight = 0;
         for (var i = 0; i < rectList.length; i++) {
           rectRight = Math.max(rectRight, rectList[i].right);
@@ -231,7 +74,7 @@ function getTextNodeHeight(textNode) {
     return selHeight;
 }
 
-function getTextNodeOffsetTop(textNode) {
+function getTextNodeOffsetTop(textNode, style) {
     var scrollOffset = painter.style.getViewportPageOffset(document);
 
     var selHeight = 0;
@@ -242,14 +85,18 @@ function getTextNodeOffsetTop(textNode) {
       var range = document.createRange();
       range.selectNode(textNode);
       var rectList = range.getClientRects();
+      var topMod = 0;
+      if (textNode.nodeType != 3 && textNode.tagName == 'INPUT') {
+        topMod = style.border.top;
+      }
       if (rectList.length > 0) {
-        return Math.round(rectList[0].top + scrollOffset.y);
+        return Math.round((rectList[0].top + topMod) + scrollOffset.y);
       }
     }
     return selHeight;
 }
 
-function getTextNodeOffsetLeft(textNode) {
+function getTextNodeOffsetLeft(textNode, style) {
     var scrollOffset = painter.style.getViewportPageOffset(document);
 
     var selHeight = 0;
@@ -260,13 +107,17 @@ function getTextNodeOffsetLeft(textNode) {
       var range = document.createRange();
       range.selectNode(textNode);
       var rectList = range.getClientRects();
-      console.log(textNode);
-      console.log(rectList);
       if (rectList.length > 0) {
         var rectLeft = rectList[0].left - scrollOffset.x;
+        var leftMod = 0;
+        if (textNode.nodeType != 3 && textNode.tagName == 'INPUT') {
+          leftMod = style.border.left;
+        }
+        rectLeft += leftMod;
         var finalRectLeft = rectLeft;
         for (var i = 0; i < rectList.length; i++) {
           finalRectLeft = Math.min(finalRectLeft, rectList[i].left - scrollOffset.x);
+          finalRectLeft += leftMod;
         }
         return {
           left: finalRectLeft,
@@ -350,38 +201,33 @@ painter.Box.parseStyle = function(element) {
   if (element.tagName == 'SELECT' || element.tagName == 'OPTION') {
     //console.log(element.options);
   } else if (element.tagName == 'INPUT' && (element.type == 'text' || element.type == 'submit')) {
-        var t = element.value;
-        if (style3.textTransform == 'uppercase') {
-          t = t.toUpperCase();
-        } else if (style3.textTransform == 'lowercase') {
-          t = t.toLowerCase();
-        } else if (style3.textTransform == 'capitalize') {
-          t = t.capitalize();
-        }
-        var textOffset = {
-          x: 0,
-          y: 0
-        };
-        var offsetLeft = getTextNodeOffsetLeft(element);
-        textOffset.x = offsetLeft.left - (offset.x + style2.padding.left);
-        textOffset.y = getTextNodeOffsetTop(element) - (offset.y + style2.padding.top);
-        style2.text.push({
-          text: t,
-          offset: {
-            left: textOffset.x,
-            top: textOffset.y
-          },
-          indent: offsetLeft.indent,
-          left: offsetLeft.left,
-          top: getTextNodeOffsetTop(element),
-          width: getTextNodeWidth(element),
-          height: getTextNodeHeight(element)
-        });
-    /*style2.text = element.value;
+    var t = element.value;
     if (style3.textTransform == 'uppercase') {
-      style2.text.push(style2.text.toUpperCase());
-      //console.log(style3);
-    }*/
+      t = t.toUpperCase();
+    } else if (style3.textTransform == 'lowercase') {
+      t = t.toLowerCase();
+    } else if (style3.textTransform == 'capitalize') {
+      t = t.capitalize();
+    }
+    var textOffset = {
+      x: 0,
+      y: 0
+    };
+    var offsetLeft = getTextNodeOffsetLeft(element, style2);
+    textOffset.x = offsetLeft.left - (offset.x + style2.padding.left);
+    textOffset.y = getTextNodeOffsetTop(element, style2) - (offset.y + style2.padding.top);
+    style2.text.push({
+      text: t,
+      offset: {
+        left: textOffset.x,
+        top: textOffset.y
+      },
+      indent: offsetLeft.indent,
+      left: offsetLeft.left,
+      top: getTextNodeOffsetTop(element, style2),
+      width: getTextNodeWidth(element, style2),
+      height: getTextNodeHeight(element)
+    });
   } else {
 
     for (var i = 0, j = element.childNodes.length; i < j; i++) {
@@ -403,7 +249,7 @@ painter.Box.parseStyle = function(element) {
             t = t.substring(1, t.length);
           }
         }
-        var offsetLeft = getTextNodeOffsetLeft(element.childNodes[i]);
+        var offsetLeft = getTextNodeOffsetLeft(element.childNodes[i], style2);
         textOffset.x = offsetLeft.left - (offset.x + style2.padding.left);
         textOffset.y = getTextNodeOffsetTop(element.childNodes[i]) - (offset.y + style2.padding.top);
         style2.text.push({
@@ -415,7 +261,7 @@ painter.Box.parseStyle = function(element) {
           indent: offsetLeft.indent,
           left: offsetLeft.left,
           top: getTextNodeOffsetTop(element.childNodes[i]),
-          width: getTextNodeWidth(element.childNodes[i]),
+          width: getTextNodeWidth(element.childNodes[i], style2),
           height: getTextNodeHeight(element.childNodes[i])
         });
       }
@@ -762,9 +608,6 @@ painter.Box.prototype.drawText = function() {
   }*/
 
   if (this.style.textShadow != 'none') {
-    /*console.log(this.style.rect);
-    console.log(rect);
-    console.log('----');*/
     var shadow = this.style.textShadow;
     shadow = shadow.replace(/,\s+/g, ',_');
     var parts = shadow.split(' ');
@@ -775,10 +618,7 @@ painter.Box.prototype.drawText = function() {
   }
   
   var lh = parseFloat(this.style.lineHeight, 10);
-  //rect.top += Math.floor(lh  / 2);
   
-//console.log(this.style.text);
-
   //var fontArr = this.style.fontFamily.split(',');
 
   //load_sys(fontArr[0], this.style.fontSize);
@@ -1367,21 +1207,14 @@ painter.Box.fromDom = function(element) {
   }
   box_.determineTextDecorations(element.parentNode);
 
-  /*if (element.className == 'social') {
-    console.log(painter.style.getOffsetParent(element));
-    console.log(painter.style.getOffsetParent(painter.style.getOffsetParent(element)));
-    console.log(element);
-  }*/
-
   for (var i = 0, l = element.childNodes.length; i < l; i++) {
-    //box_.addChild(painter.Box.fromDom(element.childNodes[i]));
     painter.Box.fromDom(element.childNodes[i]);
   }
   
   return box_;
 };
   
-function is_all_ws( nod )
+function is_all_ws(nod)
 {
   // Use ECMA-262 Edition 3 String and RegExp features
   return !(/[^\t\n\r ]/.test(nod.data));

@@ -770,47 +770,26 @@ painter.Box.prototype.drawText = function() {
   //load_sys(fontArr[0], this.style.fontSize);
 
   for (var i = 0, j = this.style.text.length; i < j; i++) {
-    //console.log(this.style.text[i].offset);
     var rct = rect.clone();
-    //rct.width = parseInt(this.style.width, 10);
     rct.width = this.style.text[i].width;
     rct.height = this.style.text[i].height;
     rct.left = this.style.text[i].left;
     rct.top = this.style.text[i].top;
 
-    //if (rct.width > rect.width) {
-      console.log(this.style.text[i].text);
-      console.log(rect.width);
-      var textHeight = wrappedTextHeight(ctx, this.style.text[i].text, rct.left, rct.top, rct.width, lh, this.style.textIndent, this.style.text[i].offset, parseInt(this.style.fontSize, 10), this.actualTextDecorations);
-      var differences = [];
-      var slices = [];
-      if (this.style.visibleBox) {
-        /*if (!rect.intersection(this.style.visibleBox)) {
-          return false;
-        }*/
-        differences = math.Rect.difference(rct, rect);
-        console.log(differences);
-        for (var k = 0; k < differences.length; k++) {
-          slices.push(ctx.getImageData(differences[k].left, differences[k].top, differences[k].width, differences[k].height));
-        }
+    var differences = [];
+    var slices = [];
+    if (this.style.visibleBox) {
+      differences = math.Rect.difference(rct, rect);
+      for (var k = 0; k < differences.length; k++) {
+        slices.push(ctx.getImageData(differences[k].left, differences[k].top, differences[k].width, differences[k].height));
       }
-      var widthDiff = rct.width - rect.width;
-      console.log(widthDiff);
-      console.log(textHeight);
-      console.log("VISIBLE BOX:");
-      console.log(rect);
-      //var slice = ctx.getImageData(rct.left + widthDiff, rct.top, widthDiff, textHeight);
-      wrapText(ctx, this.style.text[i].text, rct.left, rct.top, rct.width, lh, 0, { left: 0, top: 0}, parseInt(this.style.fontSize, 10), this.actualTextDecorations);
-      if (slices.length > 0) {
-        for (var l = 0; l < differences.length; l++) {
-          ctx.putImageData(slices[l], differences[l].left, differences[l].top);
-        }
+    }
+    wrapText(ctx, this.style.text[i].text, rct.left, rct.top, rct.width, lh, 0, { left: 0, top: 0}, parseInt(this.style.fontSize, 10), this.actualTextDecorations);
+    if (slices.length > 0) {
+      for (var l = 0; l < differences.length; l++) {
+        ctx.putImageData(slices[l], differences[l].left, differences[l].top);
       }
-    //} else {
-    //  wrapText(ctx, this.style.text[i].text, rct.left, rct.top, rct.width, lh, this.style.textIndent, this.style.text[i].offset, parseInt(this.style.fontSize, 10), this.actualTextDecorations);
-    //}
-
-    //wrapText(ctx, this.style.text[i].text, rct.left, rct.top, rct.width, parseFloat(this.style.lineHeight, 10), this.style.textIndent);
+    }
   }
     
   ctx.restore();
@@ -1239,6 +1218,7 @@ painter.Box.prototype.drawBackground = function() {
 
       patternWidth = Math.min(elemWidth, patternWidth);
       patternHeight = Math.min(elemHeight, patternHeight);
+      var crop = false;
 
       /* Formulas taken from http://blog.vjeux.com/2013/image/css-container-and-cover.html */
       if (bgSize == 'cover') {
@@ -1251,6 +1231,7 @@ painter.Box.prototype.drawBackground = function() {
           patternWidth = elemHeight * imgRatio;
           patternHeight = elemHeight;          
         }
+        crop = true;
       } else if (bgSize == 'contain') {
         var imgRatio = imgWidth / imgHeight;
         var elemRatio = elemWidth / elemHeight;
@@ -1261,16 +1242,21 @@ painter.Box.prototype.drawBackground = function() {
           patternWidth = elemWidth;
           patternHeight = elemWidth / imgRatio;      
         }
+        crop = true;
       }
 
       patternWidth = Math.floor(patternWidth);
       patternHeight = Math.floor(patternHeight);
 
       var tmpCanvas = document.createElement("canvas");
-      tmpCanvas.width = patternWidth;
-      tmpCanvas.height = patternHeight;
+      tmpCanvas.width = this.naturalWidth < patternWidth ? this.naturalWidth : patternWidth;
+      tmpCanvas.height = this.naturalHeight < patternHeight ? this.naturalHeight : patternHeight;
       var patternCtx = tmpCanvas.getContext('2d');
-      patternCtx.drawImage(this, 0, 0, patternWidth, patternHeight);
+      if (crop) {
+        patternCtx.drawImage(this, 0, 0, patternWidth, patternHeight);
+      } else {
+        patternCtx.drawImage(this, 0, 0, patternWidth, patternHeight, 0, 0, patternWidth, patternHeight);
+      }
 
       var pattern = ctx.createPattern(tmpCanvas, 'repeat');
 

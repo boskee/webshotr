@@ -199,7 +199,7 @@ function getTextNodeWidth(textNode) {
       range.selectNode(textNode);
       var rectList = range.getClientRects();
       if (rectList.length > 0) {
-        var rectLeft = rectList[0].left;
+        var rectLeft = getTextNodeOffsetLeft(textNode).left;
         var rectRight = 0;
         for (var i = 0; i < rectList.length; i++) {
           rectRight = Math.max(rectRight, rectList[i].right);
@@ -260,8 +260,18 @@ function getTextNodeOffsetLeft(textNode) {
       var range = document.createRange();
       range.selectNode(textNode);
       var rectList = range.getClientRects();
+      console.log(textNode);
+      console.log(rectList);
       if (rectList.length > 0) {
-        return Math.round(rectList[0].left + scrollOffset.x);
+        var rectLeft = rectList[0].left - scrollOffset.x;
+        var finalRectLeft = rectLeft;
+        for (var i = 0; i < rectList.length; i++) {
+          finalRectLeft = Math.min(finalRectLeft, rectList[i].left - scrollOffset.x);
+        }
+        return {
+          left: finalRectLeft,
+          indent: rectLeft - finalRectLeft
+        };
       }
     }
     return selHeight;
@@ -352,7 +362,8 @@ painter.Box.parseStyle = function(element) {
           x: 0,
           y: 0
         };
-        textOffset.x = getTextNodeOffsetLeft(element) - (offset.x + style2.padding.left);
+        var offsetLeft = getTextNodeOffsetLeft(element);
+        textOffset.x = offsetLeft.left - (offset.x + style2.padding.left);
         textOffset.y = getTextNodeOffsetTop(element) - (offset.y + style2.padding.top);
         style2.text.push({
           text: t,
@@ -360,7 +371,8 @@ painter.Box.parseStyle = function(element) {
             left: textOffset.x,
             top: textOffset.y
           },
-          left: getTextNodeOffsetLeft(element),
+          indent: offsetLeft.indent,
+          left: offsetLeft.left,
           top: getTextNodeOffsetTop(element),
           width: getTextNodeWidth(element),
           height: getTextNodeHeight(element)
@@ -391,7 +403,8 @@ painter.Box.parseStyle = function(element) {
             t = t.substring(1, t.length);
           }
         }
-        textOffset.x = getTextNodeOffsetLeft(element.childNodes[i]) - (offset.x + style2.padding.left);
+        var offsetLeft = getTextNodeOffsetLeft(element.childNodes[i]);
+        textOffset.x = offsetLeft.left - (offset.x + style2.padding.left);
         textOffset.y = getTextNodeOffsetTop(element.childNodes[i]) - (offset.y + style2.padding.top);
         style2.text.push({
           text: t,
@@ -399,7 +412,8 @@ painter.Box.parseStyle = function(element) {
             left: textOffset.x,
             top: textOffset.y
           },
-          left: getTextNodeOffsetLeft(element.childNodes[i]),
+          indent: offsetLeft.indent,
+          left: offsetLeft.left,
           top: getTextNodeOffsetTop(element.childNodes[i]),
           width: getTextNodeWidth(element.childNodes[i]),
           height: getTextNodeHeight(element.childNodes[i])
@@ -784,7 +798,7 @@ painter.Box.prototype.drawText = function() {
         slices.push(ctx.getImageData(differences[k].left, differences[k].top, differences[k].width, differences[k].height));
       }
     }
-    wrapText(ctx, this.style.text[i].text, rct.left, rct.top, rct.width, lh, 0, { left: 0, top: 0}, parseInt(this.style.fontSize, 10), this.actualTextDecorations);
+    wrapText(ctx, this.style.text[i].text, rct.left, rct.top, rct.width, lh, this.style.text[i].indent, { left: 0, top: 0}, parseInt(this.style.fontSize, 10), this.actualTextDecorations);
     if (slices.length > 0) {
       for (var l = 0; l < differences.length; l++) {
         ctx.putImageData(slices[l], differences[l].left, differences[l].top);

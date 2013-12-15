@@ -22,6 +22,15 @@ function writeToolbarScript(name) {
   s.parentNode.insertBefore(tb, s);
 }
 
+function writeToolbarStylesheet(name) {
+  var tb = document.createElement('link');
+  tb.rel = 'stylesheet';
+  tb.type = 'text/css';
+  tb.href = toolbarScriptPath + name;
+  var s = document.getElementsByTagName('head')[0].lastChild;
+  s.parentNode.insertBefore(tb, s);
+}
+
 var renderedSize = {width: 0, height: 0};
 	
 function data_of( txt )
@@ -39,8 +48,11 @@ function data_of( txt )
   
 	function postRender() {
 		var previewImg = Canvas2Image.saveAsPNG(document.getElementById('thecanvas'), true);
-		document.body.appendChild(previewImg);
-		//document.getElementById('thecanvas').remove();
+    if (previewImg) {
+		  document.body.appendChild(previewImg);
+		  document.getElementById('thecanvas').remove();
+      document.getElementById('webshotr-overlay').style.display = 'none';
+    }
 	}
 
 var underline = function(ctx, x, y, width, thickness) {
@@ -221,8 +233,20 @@ function wrappedTextHeight(context, text, x, y, maxWidth, lineHeight, textIndent
   return Math.ceil(actualHeight);
 }	
 
+function doRender() {
+  var canvasObj = document.createElement("canvas");
+  canvasObj.width = renderedSize.width;
+  canvasObj.height = renderedSize.height;
+  canvasObj.style.display = 'none';
+  canvasObj.id = 'thecanvas';
+  document.body.appendChild(canvasObj);
+  painter.Box.fromDom(document.body).render(postRender);
+  document.getElementById('thecanvas').style.display = 'block';  
+}
+
 (function($) {
   toolbarScriptPath = scriptPath();
+  writeToolbarStylesheet('toolbar.css');
   writeToolbarScript('Font.js');
   writeToolbarScript('color.js');
   writeToolbarScript('canvas2image.js');
@@ -235,13 +259,15 @@ function wrappedTextHeight(context, text, x, y, maxWidth, lineHeight, textIndent
 	$(window).load(function() {
 		renderedSize.width = $(document).outerWidth();
 		renderedSize.height = $(document).outerHeight();
-	  var canvasObj = document.createElement("canvas");
-	  canvasObj.width = renderedSize.width;
-	  canvasObj.height = renderedSize.height;
-	  canvasObj.style.display = 'none';
-	  canvasObj.id = 'thecanvas';
-	  document.body.appendChild(canvasObj);
-    	painter.Box.fromDom(document.body).render(postRender);
-		document.getElementById('thecanvas').style.display = 'block';
+    var toolbarObj = document.createElement("div");
+    toolbarObj.id = 'webshotr-toolbar';
+    toolbarObj.innerHTML = '<button id="webshotr-btn">Take a screenshot</button>';
+    document.body.appendChild(toolbarObj);
+    document.getElementById('webshotr-btn').onclick = function() {
+      var progressOverlay = document.createElement("div");
+      progressOverlay.id = 'webshotr-overlay';
+      document.body.appendChild(progressOverlay);
+      window.setTimeout(doRender, 100);
+    };
 	});
 }(jQuery));

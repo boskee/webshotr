@@ -7,25 +7,26 @@ painter.style.getStyleObject = function(dom) {
   var style;
   var returns = {};
   
-  if (dom.styleUUID && painter.style.styleCache[dom.styleUUID]) {
-    return painter.style.styleCache[dom.styleUUID];
+  if (dom.style.UUID && painter.style.styleCache[dom.style.UUID]) {
+    return painter.style.styleCache[dom.style.UUID];
   }
     
-  if(window.getComputedStyle) {
+  if (style = dom.currentStyle) {
+    for(var prop in style){
+        returns[prop] = style[prop];
+    }
+  } else if(window.getComputedStyle) {
     var camelize = function(a,b){
         return b.toUpperCase();
     };
-    if (style = window.getComputedStyle(dom, null)) {
+    var doc = painter.dom.getOwnerDocument(dom);
+    if (style = doc.defaultView.getComputedStyle(dom, null)) {
       for(var i = 0, l = style.length; i < l; i++){
           var prop = style[i];
           var camel = prop.replace(/\-([a-z])/g, camelize);
-          var val = style.getPropertyValue(prop);
+          var val = style[camel] || style.getPropertyValue(camel) || '';
           returns[camel] = val;
       };
-    }
-  } else if(style = dom.currentStyle) {
-    for(var prop in style){
-        returns[prop] = style[prop];
     }
   } else if(style = dom.style) {
     for(var prop in style){
@@ -34,8 +35,8 @@ painter.style.getStyleObject = function(dom) {
       };
     };
   };
-  dom.styleUUID = '_sp' + (painter.style.UUID++);
-  painter.style.styleCache[dom.styleUUID] = returns;
+  dom.style.UUID = '_sp' + (painter.style.UUID++);
+  painter.style.styleCache[dom.style.UUID] = returns;
   return returns;
 };
 

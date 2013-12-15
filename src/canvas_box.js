@@ -197,6 +197,13 @@ painter.Box.parseStyle = function(element) {
     text: [],
     textIndent: parseInt(style3.textIndent, 10)
   });
+
+  if (style2.textDecoration != "none") {
+    if (style2.textDecoration.indexOf(" ") != -1) {
+      var tmpArr = style2.textDecoration.split(" ");
+      style2.textDecoration = tmpArr[0];
+    }
+  }
   
   if (element.tagName == 'SELECT' || element.tagName == 'OPTION') {
     //console.log(element.options);
@@ -850,7 +857,7 @@ painter.Box.prototype.drawBorder = function(borderSide) {
       if (borderSide == 'left' || borderSide == 'top') {
         borderColor = borderColor.blend(blackColour, 0.33);
       }
-        this.doDrawBorder(ctx, borderRect, borderSide, borderColor);
+      this.doDrawBorder(ctx, borderRect, borderSide, borderColor);
     }
     else if (borderStyle == 'outset') {
       if (borderSide == 'right' || borderSide == 'bottom') {
@@ -1191,7 +1198,16 @@ var boxRefs = {
 };
 
 painter.Box.fromDom = function(element) {
-  if (!element.tagName || element.tagName == 'SCRIPT' || element.tagName == 'STYLE' || element.tagName == 'LINK' || element.tagName == 'CANVAS' || is_all_ws(element) || element.nodeType == 3) {
+  var ignoredTags = ['script', 'style', 'link', 'canvas'];
+  var ignoredIds = ['webshotr-toolbar', 'webshotr-overlay'];
+
+  if (
+    !element.tagName ||
+    inArray(element.tagName.toLowerCase(), ignoredTags) ||
+    inArray(element.id, ignoredIds) ||
+    is_all_ws(element) ||
+    element.nodeType == 3
+  ) {
     return null;
   }
 
